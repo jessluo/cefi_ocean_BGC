@@ -35,11 +35,24 @@ contains
 	! CBED variables
 	real, dimension(isc:iec,jsc:jec) :: fntot_in, fptot_in, ffetot_in, fsitot_in
 	real, dimension(isc:iec,jsc:jec) :: no3, nh4, o2, dic, odu, alk
-	real, dimension(isc:iec,jsc:jec) :: nomf, nomm, noms, nomtot ! nitrogen in organic matter fast reacting, medium reacting, and slow reacting, and total
-	real, dimension(isc:iec,jsc:jec) :: focf, focm, focs, o2resp_fast, o2resp_med, o2resp_slow
-	real, dimension(isc:iec,jsc:jec) :: gamma_fast, gamma_med, gamma_slow ! organic matter decay rates, units of year-1
-	real, dimension(isc:iec,jsc:jec) :: k_o2
+	real, dimension(isc:iec,jsc:jec) :: nomf, nomm, noms, nomtot   ! nitrogen in organic matter (nom) fast reacting, medium reacting, and slow reacting, and total
+	real, dimension(isc:iec,jsc:jec) :: focf, focm, focs           ! flux of organic carbon fast, medium, slow (to calculate boundary) CHECK
+
+  real, dimension(isc:iec,jsc:jec) :: o2resp_fast, o2resp_med, o2resp_slow        ! Rate of aerobic respiration 
+  real, dimension(isc:iec,jsc:jec) :: no3resp_fast, no3resp_med, no3resp_slow     ! Rate of no3 respiration (denitrification)
+  real, dimension(isc:iec,jsc:jec) :: anaerobicresp_fast, anaerobicresp_med, anaerobicresp_slow        ! Rate of anaerobic respiration 
+
+  real, dimension(isc:iec,jsc:jec) :: nitrification, annamox, ODUox        ! secondary reactions 
+
+	real, dimension(isc:iec,jsc:jec) :: gamma_fast, gamma_med, gamma_slow     ! organic matter decay rates, units of year-1
 	
+  real :: gamma_nitrif    =   1e6         ! rate constant for nitrification ( need to make sure the values are correct for the unit used )
+  real :: gamma_anammox  =   1e6         ! rate constant for anammox
+  real :: gamma_oduox    =   1e6         ! rate constant for ODU oxidation
+
+  real :: k_o2  =   0.008            ! mol/m3        ! half-saturation constant for aerobic respiration (conc. unit)
+  real :: k_no3 =   0.001            ! mol/m3        ! half-saturation constant for denitrification (conc. unit)
+
 	real :: frac_omf = 0.7 ! fraction of organic matter in fast reacting pool
 	real :: frac_omm = 0.2 ! fraction of organic matter in medium reacting pool
 	real :: frac_oms = 0.1 ! fraction of organic matter in slow reacting pool
@@ -120,12 +133,35 @@ contains
 			 focm(i,j) = fntot_in(i,j)*cobalt%c_2_n * frac_omm * Rho_solid
 			 focs(i,j) = fntot_in(i,j)*cobalt%c_2_n * frac_oms * Rho_solid
 			 
-			 
+       ! calculate converstion from 'foc' to 'oc' conc in sediment  NEED TO DO 
+			 ! Should the reactions be written in 'oc' or use 'on' with c_2_n ?
+
 			 ! aerobic respiration
 			 o2resp_fast(i,j) = gamma_fast * nomf(i,j) * o2(i,j)/(k_o2 + o2(i,j))
 			 o2resp_med(i,j) = gamma_med * nomm(i,j) * o2(i,j)/(k_o2 + o2(i,j))
 			 o2resp_slow(i,j) = gamma_slow * noms(i,j) * o2(i,j)/(k_o2 + o2(i,j))
 			 
+       ! denitrification 
+       no3resp_fast(i,j)   = gamma_fast * nomf(i,j)  *  no3(i,j)/(k_no3 + no3(i,j)) * k_o2/(k_o2 + o2(i,j))
+			 no3resp_med(i,j)    = gamma_med  * nomm(i,j)  *  no3(i,j)/(k_no3 + no3(i,j)) * k_o2/(k_o2 + o2(i,j))
+			 no3resp_slow(i,j)   = gamma_slow * noms(i,j)  *  no3(i,j)/(k_no3 + no3(i,j)) * k_o2/(k_o2 + o2(i,j))
+
+       ! anaerobic respiration  
+       anaerobicresp_fast(i,j)  = gamma_fast * nomf(i,j)  * k_no3/(k_no3 + no3(i,j)) * k_o2/(k_o2 + o2(i,j))
+			 anaerobicresp_med(i,j)   = gamma_med  * nomm(i,j)  * k_no3/(k_no3 + no3(i,j)) * k_o2/(k_o2 + o2(i,j))
+			 anaerobicresp_slow(i,j)  = gamma_slow * noms(i,j)  * k_no3/(k_no3 + no3(i,j)) * k_o2/(k_o2 + o2(i,j))
+
+       !! secondary reactions
+
+       ! nitrification 
+       nitrification(i,j) = gamma_nitrif * nh4(i,j) * o2(i,j)
+
+       ! annamox 
+       annamox(i,j) = gamma_anammox * nh4(i,j) * no3(i,j)
+
+       ! ODU oxidation 
+       ODUox(i,j) = gamma_oduox * odu(i,j) * o2(i,j)
+
 
           endif !}
 
