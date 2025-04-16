@@ -35,8 +35,12 @@ contains
     ! sediment grid parameters
     real :: sed_grid_L    =   20            ! length of sediment domain (cm)
     real :: sed_grid_N    =   20            ! number of layers
-    real :: sed_grid_dz1    =  0.1          ! thickness of the first layer
-    real, dimension(:) :: sed_dz, sed_z_mid, sed_z_int
+
+
+    real :: sed_grid_dz1    =  0.1          ! thickness of the first layer (cm)
+    real, dimension(:) :: sed_dz            ! thickness of sediment layers (cm) dimention N
+    real, dimension(:) :: sed_z_mid         ! mid point of grid cell (cm) dimention N
+    real, dimension(:) :: sed_z_int         ! depth of grid cell interfaces (cm) dimention should be N+1
 
 
 	! CBED variables
