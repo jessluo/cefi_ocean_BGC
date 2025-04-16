@@ -33,14 +33,14 @@ contains
     real,    dimension(isc:iec,jsc:jec) :: rho_dzt_bot
   
     ! sediment grid parameters
-    real :: sed_grid_L    =   20            ! length of sediment domain (cm)
-    real :: sed_grid_N    =   20            ! number of layers
+    real, parameter :: sed_grid_L    =   20            ! length of sediment domain (cm)
+    real, parameter :: sed_grid_N    =   20            ! number of layers
 
 
-    real :: sed_grid_dz1    =  0.1          ! thickness of the first layer (cm)
-    real, dimension(:) :: sed_dz            ! thickness of sediment layers (cm) dimention N
-    real, dimension(:) :: sed_z_mid         ! mid point of grid cell (cm) dimention N
-    real, dimension(:) :: sed_z_int         ! depth of grid cell interfaces (cm) dimention should be N+1
+    real, parameter :: sed_grid_dz1    =  0.1          ! thickness of the first layer (cm)
+    real, dimension(sed_grid_N) :: sed_dz            ! thickness of sediment layers (cm) dimention N
+    real, dimension(sed_grid_N) :: sed_z_mid         ! mid point of grid cell (cm) dimention N
+    real, dimension(sed_grid_N+1) :: sed_z_int         ! depth of grid cell interfaces (cm) dimention should be N+1
 
 
 	! CBED variables
@@ -57,18 +57,18 @@ contains
 
 	real, dimension(isc:iec,jsc:jec) :: gamma_fast, gamma_med, gamma_slow     ! organic matter decay rates, units of year-1
 	
-  real :: gamma_nitrif    =   1e6         ! rate constant for nitrification ( need to make sure the values are correct for the unit used )
-  real :: gamma_anammox  =   1e6         ! rate constant for anammox
-  real :: gamma_oduox    =   1e6         ! rate constant for ODU oxidation
+  real, parameter :: gamma_nitrif    =   1e6         ! rate constant for nitrification ( need to make sure the values are correct for the unit used )
+  real, parameter :: gamma_anammox  =   1e6         ! rate constant for anammox
+  real, parameter :: gamma_oduox    =   1e6         ! rate constant for ODU oxidation
 
-  real :: k_o2  =   0.008            ! mol/m3        ! half-saturation constant for aerobic respiration (conc. unit)
-  real :: k_no3 =   0.001            ! mol/m3        ! half-saturation constant for denitrification (conc. unit)
+  real, parameter :: k_o2  =   0.008            ! mol/m3        ! half-saturation constant for aerobic respiration (conc. unit)
+  real, parameter :: k_no3 =   0.001            ! mol/m3        ! half-saturation constant for denitrification (conc. unit)
 
-	real :: frac_omf = 0.7 ! fraction of organic matter in fast reacting pool
-	real :: frac_omm = 0.2 ! fraction of organic matter in medium reacting pool
-	real :: frac_oms = 0.1 ! fraction of organic matter in slow reacting pool
-	real :: phi = 0.8      ! porosity, starting with a fixed value
-	real :: Rho_solid = 2.5e3 ! solid density (kg/m3), use Rho_0 from cobalt for seawater density (1035 kg/m3)
+	real, parameter :: frac_omf = 0.7 ! fraction of organic matter in fast reacting pool
+	real, parameter :: frac_omm = 0.2 ! fraction of organic matter in medium reacting pool
+	real, parameter :: frac_oms = 0.1 ! fraction of organic matter in slow reacting pool
+	real, parameter :: phi = 0.8      ! porosity, starting with a fixed value
+	real, parameter :: Rho_solid = 2.5e3 ! solid density (kg/m3), use Rho_0 from cobalt for seawater density (1035 kg/m3)
 
 
   ! sediment grid 
