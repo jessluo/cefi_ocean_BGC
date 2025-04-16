@@ -31,6 +31,13 @@ contains
     real :: fpoc_btm, drho_dzt, log10_fpoc_btm
     integer, dimension(isc:iec,jsc:jec) :: k_bot
     real,    dimension(isc:iec,jsc:jec) :: rho_dzt_bot
+  
+    ! sediment grid parameters
+    real :: sed_grid_L    =   20            ! length of sediment domain (cm)
+    real :: sed_grid_N    =   20            ! number of layers
+    real :: sed_grid_dz1    =  0.1          ! thickness of the first layer
+    real, dimension(:) :: sed_dz, sed_z_mid, sed_z_int
+
 
 	! CBED variables
 	real, dimension(isc:iec,jsc:jec) :: fntot_in, fptot_in, ffetot_in, fsitot_in
@@ -58,6 +65,20 @@ contains
 	real :: frac_oms = 0.1 ! fraction of organic matter in slow reacting pool
 	real :: phi = 0.8      ! porosity, starting with a fixed value
 	real :: Rho_solid = 2.5e3 ! solid density (kg/m3), use Rho_0 from cobalt for seawater density (1035 kg/m3)
+
+
+  ! sediment grid 
+  sed_dz = sed_grid_L/sed_grid_N
+  
+  sed_z_int(1) = 0.0 
+  do sed_nk = 1, (sed_grid_N -1)
+    sed_z_int(1+sed_nk) = sed_z_int(sed_nk) + sed_dz(sed_nk)
+  end do
+
+  sed_z_mid(1) = 0.0 + sed_dz/2
+  do sed_nk = 1, (sed_grid_N-1)
+    sed_z_mid(1+sed_nk) = sed_z_mid(sed_nk) + sed_dz(sed_nk)
+  end do
 
     ! Calculate the bottom conditions and the fluxes to the bottom for diagnostics and benthic flux calculations.
     ! MOM4/5 used the bottom grid cell, but MOM6 often has a number of vanishingly thin layers overlying the bottom.
