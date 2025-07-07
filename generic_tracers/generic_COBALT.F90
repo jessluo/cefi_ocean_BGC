@@ -1439,6 +1439,9 @@ contains
     call get_param(param_file, "generic_COBALT", "hp_phi_det", cobalt%hp_phi_det, &
                    "fraction of ingestion by higher predators to detritus", units="none", default=0.35)
 
+    call get_param(param_file, "generic_COBALT", "frac_fastsinking", cobalt%frac_fastsinking, &
+            "Fraction of N and P detritus higher predators that is fast-sinking", default=1.0)
+
     ! Radiocarbon
     call get_param(param_file, "generic_COBALT", "half_life_14c", cobalt%half_life_14c, "half_life_14c", units="s", default= 5730.0 )                  ! s
     call get_param(param_file, "generic_COBALT", "lambda_14c",    cobalt%lambda_14c,    "lambda_14c",    units="-s", &
@@ -4624,9 +4627,16 @@ contains
 
        ! Production of detritus and dissolved organic material from higher predator egestion
        if (cobalt%do_fastsinking) then
-          ! Assume all the egestion from higher predators will sink quickly and go to fast-sinking detritus
-          cobalt%jprod_ndet_fast(i,j,k) = cobalt%jprod_ndet_fast(i,j,k) + cobalt%hp_phi_det*cobalt%hp_jingest_n(i,j,k)
-          cobalt%jprod_pdet_fast(i,j,k) = cobalt%jprod_pdet_fast(i,j,k) + cobalt%hp_phi_det*cobalt%hp_jingest_p(i,j,k)
+          ! A portion of the egestion (determined by frac_fastsinking) from higher predators will sink quickly and go to fast-sinking detritus
+          cobalt%jprod_ndet_fast(i,j,k) = cobalt%jprod_ndet_fast(i,j,k) + &
+		                                  cobalt%frac_fastsinking*cobalt%hp_phi_det*cobalt%hp_jingest_n(i,j,k)
+          cobalt%jprod_pdet_fast(i,j,k) = cobalt%jprod_pdet_fast(i,j,k) + &
+		                                  cobalt%frac_fastsinking*cobalt%hp_phi_det*cobalt%hp_jingest_p(i,j,k)
+
+          cobalt%jprod_ndet(i,j,k) = cobalt%jprod_ndet(i,j,k) + &
+		                             (1-cobalt%frac_fastsinking)*cobalt%hp_phi_det*cobalt%hp_jingest_n(i,j,k)
+          cobalt%jprod_pdet(i,j,k) = cobalt%jprod_pdet(i,j,k) + &
+		                             (1-cobalt%frac_fastsinking)*cobalt%hp_phi_det*cobalt%hp_jingest_p(i,j,k)
        else
           ! Just add the HP ndet to the cumulative total. Calculate from phi_det and hp_jingest.
           cobalt%jprod_ndet(i,j,k) = cobalt%jprod_ndet(i,j,k) + cobalt%hp_phi_det*cobalt%hp_jingest_n(i,j,k)
