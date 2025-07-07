@@ -4634,9 +4634,9 @@ contains
 		                                  cobalt%frac_fastsinking*cobalt%hp_phi_det*cobalt%hp_jingest_p(i,j,k)
 
           cobalt%jprod_ndet(i,j,k) = cobalt%jprod_ndet(i,j,k) + &
-		                             (1-cobalt%frac_fastsinking)*cobalt%hp_phi_det*cobalt%hp_jingest_n(i,j,k)
+		                             (1.0-cobalt%frac_fastsinking)*cobalt%hp_phi_det*cobalt%hp_jingest_n(i,j,k)
           cobalt%jprod_pdet(i,j,k) = cobalt%jprod_pdet(i,j,k) + &
-		                             (1-cobalt%frac_fastsinking)*cobalt%hp_phi_det*cobalt%hp_jingest_p(i,j,k)
+		                             (1.0-cobalt%frac_fastsinking)*cobalt%hp_phi_det*cobalt%hp_jingest_p(i,j,k)
        else
           ! Just add the HP ndet to the cumulative total. Calculate from phi_det and hp_jingest.
           cobalt%jprod_ndet(i,j,k) = cobalt%jprod_ndet(i,j,k) + cobalt%hp_phi_det*cobalt%hp_jingest_n(i,j,k)
