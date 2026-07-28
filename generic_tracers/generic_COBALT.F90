@@ -8450,16 +8450,16 @@ contains
           zoo(n)%jremin_n_100(i,j) = zoo(n)%jprod_nh4(i,j,1) * rho_dzt(i,j,1)
        enddo   !} n
 
-       do n = 1, 4
-         if (n == 3) cycle 
+       ! The 100 m integrals below are accumulated for every zooplankton group.  Which of them
+       ! actually reach the output is decided by registration in cobalt_reg_diag: g_send_data is a
+       ! no-op when the diagnostic id is negative.  Keeping the loops over the full range avoids the
+       ! allocated-vs-registered mismatch that a hardcoded subset invites.
+       do n = 1, NUM_ZOO !{
          zoo(n)%jzloss_n_100(i,j) = zoo(n)%jzloss_n(i,j,1) * rho_dzt(i,j,1)
          zoo(n)%jprod_don_100(i,j) = (zoo(n)%jprod_ldon(i,j,1) + zoo(n)%jprod_sldon(i,j,1) + &
             zoo(n)%jprod_srdon(i,j,1))  * rho_dzt(i,j,1)
-       enddo   !} n
-
-       do n = 2,5  !{
-          zoo(n)%jhploss_n_100(i,j) = zoo(n)%jhploss_n(i,j,1) * rho_dzt(i,j,1)
-          zoo(n)%jprod_ndet_100(i,j) = zoo(n)%jprod_ndet(i,j,1) * rho_dzt(i,j,1)
+         zoo(n)%jhploss_n_100(i,j) = zoo(n)%jhploss_n(i,j,1) * rho_dzt(i,j,1)
+         zoo(n)%jprod_ndet_100(i,j) = zoo(n)%jprod_ndet(i,j,1) * rho_dzt(i,j,1)
        enddo   !} n
 
        cobalt%hp_jingest_n_100(i,j) = cobalt%hp_jingest_n(i,j,1)*rho_dzt(i,j,1)
@@ -8538,15 +8538,11 @@ contains
                    rho_dzt(i,j,k)
              enddo !} n
 
-             do n = 1,4 !{
-               if (n == 3) cycle
+             do n = 1,NUM_ZOO !{
                 zoo(n)%jzloss_n_100(i,j) = zoo(n)%jzloss_n_100(i,j) + zoo(n)%jzloss_n(i,j,k)* &
                    rho_dzt(i,j,k)
                 zoo(n)%jprod_don_100(i,j) = zoo(n)%jprod_don_100(i,j) + (zoo(n)%jprod_ldon(i,j,k) + &
                    zoo(n)%jprod_sldon(i,j,k) + zoo(n)%jprod_srdon(i,j,k))*rho_dzt(i,j,k)
-             enddo !} n
-
-             do n = 2,5 !{
                 zoo(n)%jhploss_n_100(i,j) = zoo(n)%jhploss_n_100(i,j) + zoo(n)%jhploss_n(i,j,k)* &
                    rho_dzt(i,j,k)
                 zoo(n)%jprod_ndet_100(i,j) = zoo(n)%jprod_ndet_100(i,j) + zoo(n)%jprod_ndet(i,j,k)* &
@@ -8628,15 +8624,11 @@ contains
                  drho_dzt
            enddo !} n
 
-           do n = 1,4 !{
-               if (n == 3) cycle
+           do n = 1,NUM_ZOO !{
                zoo(n)%jzloss_n_100(i,j) = zoo(n)%jzloss_n_100(i,j) + zoo(n)%jzloss_n(i,j,k_100)* &
                  drho_dzt
                zoo(n)%jprod_don_100(i,j) = zoo(n)%jprod_don_100(i,j) + (zoo(n)%jprod_ldon(i,j,k_100) + &
                  zoo(n)%jprod_sldon(i,j,k_100) + zoo(n)%jprod_srdon(i,j,k_100))*drho_dzt
-           enddo !} n
-
-           do n = 2,5 !{
                zoo(n)%jhploss_n_100(i,j) = zoo(n)%jhploss_n_100(i,j) + zoo(n)%jhploss_n(i,j,k_100)* &
                  drho_dzt
                zoo(n)%jprod_ndet_100(i,j) = zoo(n)%jprod_ndet_100(i,j) + zoo(n)%jprod_ndet(i,j,k_100)* &
@@ -8760,12 +8752,18 @@ contains
     !---------------------------------------------------------------------
     ! calculate upper 200m vertical integrals for mesozooplankton
     ! quantities for comparison with COPEPOD database
+    !
+    ! include vertically migrating (crustacean) zooplankton.  The gelatinous groups are integrated
+    ! separately as jprod_tunicate_200, since COPEPOD-style net sampling does not retain them.
     !---------------------------------------------------------------------
     !
     allocate(rho_dzt_200(isc:iec,jsc:jec))
     do j = jsc, jec ; do i = isc, iec !{
        rho_dzt_200(i,j) = rho_dzt(i,j,1)
-       cobalt%jprod_mesozoo_200(i,j) = (zoo(MDZ)%jprod_n(i,j,1) + zoo(LGZ)%jprod_n(i,j,1))*rho_dzt(i,j,1)
+       cobalt%jprod_mesozoo_200(i,j) = (zoo(MDZ)%jprod_n(i,j,1) + zoo(LGZ)%jprod_n(i,j,1) + &
+             zoo(VMMDZ)%jprod_n(i,j,1) + zoo(VMLGZ)%jprod_n(i,j,1))*rho_dzt(i,j,1)
+       cobalt%jprod_tunicate_200(i,j) = (zoo(SMT)%jprod_n(i,j,1) + &
+             zoo(LGT)%jprod_n(i,j,1))*rho_dzt(i,j,1)
        cobalt%jprod_allphytos_200(i,j) = (phyto(1)%jprod_n(i,j,1) + phyto(2)%jprod_n(i,j,1) + &
              phyto(3)%jprod_n(i,j,1) + phyto(4)%jprod_n(i,j,1))*rho_dzt(i,j,1);
     enddo; enddo !} i,j
@@ -8777,7 +8775,10 @@ contains
              k_200 = k
              rho_dzt_200(i,j) = rho_dzt_200(i,j) + rho_dzt(i,j,k)
              cobalt%jprod_mesozoo_200(i,j) = cobalt%jprod_mesozoo_200(i,j) + &
-                (zoo(MDZ)%jprod_n(i,j,k) + zoo(LGZ)%jprod_n(i,j,k))*rho_dzt(i,j,k)
+                (zoo(MDZ)%jprod_n(i,j,k) + zoo(LGZ)%jprod_n(i,j,k) + &
+                 zoo(VMMDZ)%jprod_n(i,j,k) + zoo(VMLGZ)%jprod_n(i,j,k))*rho_dzt(i,j,k)
+             cobalt%jprod_tunicate_200(i,j) = cobalt%jprod_tunicate_200(i,j) + &
+                (zoo(SMT)%jprod_n(i,j,k) + zoo(LGT)%jprod_n(i,j,k))*rho_dzt(i,j,k)
              cobalt%jprod_allphytos_200(i,j) = cobalt%jprod_allphytos_200(i,j) + &
                  (phyto(1)%jprod_n(i,j,k) + phyto(2)%jprod_n(i,j,k) + &
                  phyto(3)%jprod_n(i,j,k) + phyto(4)%jprod_n(i,j,k))*rho_dzt(i,j,k);
@@ -8787,7 +8788,10 @@ contains
        if (k_200 .gt. 1 .and. k_200 .lt. grid_kmt(i,j)) then
           drho_dzt = cobalt%Rho_0 * 200.0 - rho_dzt_200(i,j)
           cobalt%jprod_mesozoo_200(i,j) = cobalt%jprod_mesozoo_200(i,j) + &
-              (zoo(MDZ)%jprod_n(i,j,k_200) + zoo(LGZ)%jprod_n(i,j,k_200))*drho_dzt
+              (zoo(MDZ)%jprod_n(i,j,k_200) + zoo(LGZ)%jprod_n(i,j,k_200) + &
+               zoo(VMMDZ)%jprod_n(i,j,k_200) + zoo(VMLGZ)%jprod_n(i,j,k_200))*drho_dzt
+          cobalt%jprod_tunicate_200(i,j) = cobalt%jprod_tunicate_200(i,j) + &
+              (zoo(SMT)%jprod_n(i,j,k_200) + zoo(LGT)%jprod_n(i,j,k_200))*drho_dzt
           cobalt%jprod_allphytos_200(i,j) = cobalt%jprod_allphytos_200(i,j) + &
                (phyto(1)%jprod_n(i,j,k_200) + phyto(2)%jprod_n(i,j,k_200) + &
                phyto(3)%jprod_n(i,j,k_200) + phyto(4)%jprod_n(i,j,k_200))*drho_dzt
@@ -9806,13 +9810,11 @@ contains
        allocate(zoo(n)%f_n_100(isd:ied,jsd:jed))          ; zoo(n)%f_n_100          = 0.0
     enddo
 
-   do n = 1, 4
-       if (n == 3) cycle
-       allocate(zoo(n)%jzloss_n_100(isd:ied,jsd:jed))     ; zoo(n)%jzloss_n_100     = 0.0
-       allocate(zoo(n)%jprod_don_100(isd:ied,jsd:jed))    ; zoo(n)%jprod_don_100    = 0.0
-   enddo
-
-   do n = 2, 5
+   ! Allocated for every group, whether or not the corresponding diagnostic is registered, so that
+   ! cobalt_send_diag's loop over all NUM_ZOO groups can never touch an unallocated array.
+   do n = 1, NUM_ZOO
+       allocate(zoo(n)%jzloss_n_100(isd:ied,jsd:jed))     ; zoo(n)%jzloss_n_100      = 0.0
+       allocate(zoo(n)%jprod_don_100(isd:ied,jsd:jed))    ; zoo(n)%jprod_don_100     = 0.0
        allocate(zoo(n)%jhploss_n_100(isd:ied,jsd:jed))    ; zoo(n)%jhploss_n_100     = 0.0
        allocate(zoo(n)%jprod_ndet_100(isd:ied,jsd:jed))   ; zoo(n)%jprod_ndet_100    = 0.0
    enddo
@@ -9838,6 +9840,7 @@ contains
    allocate(cobalt%jremin_ndet_100(isd:ied,jsd:jed))        ; cobalt%jremin_ndet_100 = 0.0
    allocate(cobalt%jremin_ndet_fast_100(isd:ied,jsd:jed))   ; cobalt%jremin_ndet_fast_100 = 0.0
    allocate(cobalt%jprod_mesozoo_200(isd:ied,jsd:jed))      ; cobalt%jprod_mesozoo_200 = 0.0
+   allocate(cobalt%jprod_tunicate_200(isd:ied,jsd:jed))     ; cobalt%jprod_tunicate_200 = 0.0
    allocate(cobalt%daylength(isd:ied,jsd:jed))              ; cobalt%daylength = 0.0
 
    allocate(cobalt%f_ndet_100(isd:ied,jsd:jed))             ; cobalt%f_ndet_100 = 0.0
@@ -9846,6 +9849,7 @@ contains
    allocate(cobalt%f_silg_100(isd:ied,jsd:jed))             ; cobalt%f_silg_100 = 0.0
    allocate(cobalt%f_simd_100(isd:ied,jsd:jed))             ; cobalt%f_simd_100 = 0.0
    allocate(cobalt%f_mesozoo_200(isd:ied,jsd:jed))          ; cobalt%f_mesozoo_200 = 0.0
+   allocate(cobalt%f_tunicate_200(isd:ied,jsd:jed))         ; cobalt%f_tunicate_200 = 0.0
 
    allocate(cobalt%fndet_100(isd:ied,jsd:jed))             ; cobalt%fndet_100 = 0.0
    allocate(cobalt%fndet_fast_100(isd:ied,jsd:jed))        ; cobalt%fndet_fast_100 = 0.0
@@ -9985,6 +9989,7 @@ contains
        deallocate(phyto(n)%jhploss_fe)
        deallocate(phyto(n)%jhploss_n)
        deallocate(phyto(n)%jhploss_p)
+       deallocate(phyto(n)%jhploss_sio2)
        deallocate(phyto(n)%juptake_fe)
        deallocate(phyto(n)%juptake_nh4)
        deallocate(phyto(n)%juptake_no3)
@@ -10398,6 +10403,7 @@ contains
     deallocate(cobalt%jdic_caco3_nerbur_150)
     ! >>
     deallocate(cobalt%jprod_mesozoo_200)
+    deallocate(cobalt%jprod_tunicate_200)
     deallocate(cobalt%daylength)
     deallocate(cobalt%jremin_ndet_100)
     deallocate(cobalt%jremin_ndet_fast_100)
@@ -10407,6 +10413,7 @@ contains
     deallocate(cobalt%f_silg_100)
     deallocate(cobalt%f_simd_100)
     deallocate(cobalt%f_mesozoo_200)
+    deallocate(cobalt%f_tunicate_200)
     deallocate(cobalt%fndet_100)
     deallocate(cobalt%fndet_fast_100)
     deallocate(cobalt%fpdet_100)
@@ -10518,12 +10525,9 @@ contains
        deallocate(zoo(n)%f_n_100)
     enddo
 
-    do n = 1,2
+    do n = 1, NUM_ZOO
        deallocate(zoo(n)%jzloss_n_100)
        deallocate(zoo(n)%jprod_don_100)
-    enddo
-
-    do n = 2,3
        deallocate(zoo(n)%jhploss_n_100)
        deallocate(zoo(n)%jprod_ndet_100)
     enddo

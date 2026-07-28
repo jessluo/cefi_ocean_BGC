@@ -986,6 +986,7 @@ module cobalt_types
 ! << Add neritic CaCO3 burial >>
           jdic_caco3_nerbur_150,&
           jprod_mesozoo_200, &
+          jprod_tunicate_200, &
           jremin_ndet_100, &
           jremin_ndet_fast_100, &
           f_ndet_100, &
@@ -994,6 +995,7 @@ module cobalt_types
           f_simd_100, &
           f_silg_100, &
           f_mesozoo_200, &
+          f_tunicate_200, &
           fndet_100, &
           fndet_fast_100, &
           fpdet_100, &
@@ -1458,6 +1460,7 @@ module cobalt_types
 ! << Add neritic CaCO3 burial >>
           id_jdic_caco3_nerbur_150 = -1, &
           id_jprod_mesozoo_200 = -1,   &
+          id_jprod_tunicate_200 = -1,  &
           id_daylength         = -1,   &
           id_jremin_ndet_100 = -1,     &
           id_jremin_ndet_fast_100 = -1,     &
@@ -1467,6 +1470,7 @@ module cobalt_types
           id_f_silg_100 = -1,          &
           id_f_simd_100 = -1,          &
           id_f_mesozoo_200 = -1,       &
+          id_f_tunicate_200 = -1,      &
           id_fndet_100 = -1,           &
           id_fndet_fast_100 = -1,           &
           id_fpdet_100 = -1,           &

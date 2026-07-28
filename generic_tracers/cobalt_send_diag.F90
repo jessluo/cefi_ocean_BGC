@@ -858,6 +858,8 @@ module COBALT_send_diag
             model_time, rmask = grid_tmask(:,:,1), is_in=isc, js_in=jsc, ie_in=iec, je_in=jec)
           used = g_send_data(cobalt%id_f_mesozoo_200, cobalt%f_mesozoo_200,         &
             model_time, rmask = grid_tmask(:,:,1), is_in=isc, js_in=jsc, ie_in=iec, je_in=jec)
+          used = g_send_data(cobalt%id_f_tunicate_200, cobalt%f_tunicate_200,       &
+            model_time, rmask = grid_tmask(:,:,1), is_in=isc, js_in=jsc, ie_in=iec, je_in=jec)
           used = g_send_data(cobalt%id_f_dic_int_100, cobalt%f_dic_int_100, &
             model_time, rmask = grid_tmask(:,:,1), is_in=isc, js_in=jsc, ie_in=iec, je_in=jec)
           used = g_send_data(cobalt%id_f_din_int_100, cobalt%f_din_int_100, &
@@ -900,10 +902,18 @@ module COBALT_send_diag
           used = g_send_data(cobalt%id_ffetot_100, cobalt%ffetot_100, &
             model_time, rmask = grid_tmask(:,:,1), is_in=isc, js_in=jsc, ie_in=iec, je_in=jec)
 
+          ! Mirroring the zmeso diagnostic, f_mesozoo_200 also includes gut and metabolite nitrogen.
+          ! f_mesozoo_200 covers the crustacean mesozooplankton only, for comparison with COPEPOD;
+          ! the gelatinous groups are integrated separately as f_tunicate_200 for comparison with
+          ! gelatinous zooplankton compilations such as JeDI.
           allocate(rho_dzt_200(isc:iec,jsc:jec))
           do j = jsc, jec ; do i = isc, iec !{
             rho_dzt_200(i,j) = rho_dzt(i,j,1)
-            cobalt%f_mesozoo_200(i,j) = (zoo(MDZ)%f_n(i,j,1)+zoo(LGZ)%f_n(i,j,1))*rho_dzt(i,j,1)
+            cobalt%f_mesozoo_200(i,j) = (zoo(MDZ)%f_n(i,j,1)+zoo(LGZ)%f_n(i,j,1)+&
+               zoo(VMMDZ)%f_n(i,j,1)+zoo(VMMDZ)%f_met_n(i,j,1)+zoo(VMMDZ)%f_gut_n(i,j,1)+&
+               zoo(VMLGZ)%f_n(i,j,1)+zoo(VMLGZ)%f_met_n(i,j,1)+zoo(VMLGZ)%f_gut_n(i,j,1))*rho_dzt(i,j,1)
+            cobalt%f_tunicate_200(i,j) = (zoo(SMT)%f_n(i,j,1)+&
+               zoo(LGT)%f_n(i,j,1)+zoo(LGT)%f_met_n(i,j,1)+zoo(LGT)%f_gut_n(i,j,1))*rho_dzt(i,j,1)
           enddo; enddo !} i,j
 
           do j = jsc, jec ; do i = isc, iec ; !{
@@ -913,14 +923,24 @@ module COBALT_send_diag
                 k_200 = k
                 rho_dzt_200(i,j) = rho_dzt_200(i,j) + rho_dzt(i,j,k)
                 cobalt%f_mesozoo_200(i,j) = cobalt%f_mesozoo_200(i,j) + &
-                  (zoo(MDZ)%f_n(i,j,k)+zoo(LGZ)%f_n(i,j,k))*rho_dzt(i,j,k)
+                  (zoo(MDZ)%f_n(i,j,k)+zoo(LGZ)%f_n(i,j,k)+&
+                   zoo(VMMDZ)%f_n(i,j,k)+zoo(VMMDZ)%f_met_n(i,j,k)+zoo(VMMDZ)%f_gut_n(i,j,k)+&
+                   zoo(VMLGZ)%f_n(i,j,k)+zoo(VMLGZ)%f_met_n(i,j,k)+zoo(VMLGZ)%f_gut_n(i,j,k))*rho_dzt(i,j,k)
+                cobalt%f_tunicate_200(i,j) = cobalt%f_tunicate_200(i,j) + &
+                  (zoo(SMT)%f_n(i,j,k)+&
+                   zoo(LGT)%f_n(i,j,k)+zoo(LGT)%f_met_n(i,j,k)+zoo(LGT)%f_gut_n(i,j,k))*rho_dzt(i,j,k)
               endif
             enddo  !} k
 
             if (k_200 .gt. 1 .and. k_200 .lt. grid_kmt(i,j)) then
               drho_dzt = cobalt%Rho_0 * 200.0 - rho_dzt_200(i,j)
               cobalt%f_mesozoo_200(i,j) = cobalt%f_mesozoo_200(i,j) + &
-                (zoo(MDZ)%f_n(i,j,k_200)+zoo(LGZ)%f_n(i,j,k_200))*drho_dzt
+                (zoo(MDZ)%f_n(i,j,k_200)+zoo(LGZ)%f_n(i,j,k_200)+&
+                 zoo(VMMDZ)%f_n(i,j,k_200)+zoo(VMMDZ)%f_met_n(i,j,k_200)+zoo(VMMDZ)%f_gut_n(i,j,k_200)+&
+                 zoo(VMLGZ)%f_n(i,j,k_200)+zoo(VMLGZ)%f_met_n(i,j,k_200)+zoo(VMLGZ)%f_gut_n(i,j,k_200))*drho_dzt
+              cobalt%f_tunicate_200(i,j) = cobalt%f_tunicate_200(i,j) + &
+                (zoo(SMT)%f_n(i,j,k_200)+&
+                 zoo(LGT)%f_n(i,j,k_200)+zoo(LGT)%f_met_n(i,j,k_200)+zoo(LGT)%f_gut_n(i,j,k_200))*drho_dzt
             endif
           enddo ; enddo  !} i,j
           deallocate(rho_dzt_200)
@@ -1963,6 +1983,8 @@ module COBALT_send_diag
               model_time, rmask = grid_tmask(:,:,1), is_in=isc, js_in=jsc, ie_in=iec, je_in=jec)
           enddo !} n
           used = g_send_data(cobalt%id_jprod_mesozoo_200, cobalt%jprod_mesozoo_200, &
+            model_time, rmask = grid_tmask(:,:,1), is_in=isc, js_in=jsc, ie_in=iec, je_in=jec)
+          used = g_send_data(cobalt%id_jprod_tunicate_200, cobalt%jprod_tunicate_200, &
             model_time, rmask = grid_tmask(:,:,1), is_in=isc, js_in=jsc, ie_in=iec, je_in=jec)
           ! Higher predator 100m flux integrals
           used = g_send_data(cobalt%id_hp_jingest_n_100, cobalt%hp_jingest_n_100, &
