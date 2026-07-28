@@ -27,6 +27,17 @@ module COBALT_reg_diag
     ! local
     type(vardesc)  :: vardesc_temp
     integer :: axesTi(3)
+    integer :: nzoo                                     !< loop index over zooplankton groups
+    !> Short and long names for each zooplankton group, ordered to match the group IDs in cobalt_types.
+    !! These drive the loop-based registrations at the end of this routine; the older per-group blocks
+    !! above remain written out explicitly.
+    character(len=5), dimension(NUM_ZOO), parameter :: zoo_sfx = &
+         (/ 'Smz  ', 'Mdz  ', 'Lgz  ', 'vmMdz', 'vmLgz', 'Smt  ', 'Lgt  ' /)
+    character(len=32), dimension(NUM_ZOO), parameter :: zoo_name = &
+         (/ 'small zooplankton               ', 'medium zooplankton              ', &
+            'large zooplankton               ', 'medium migrating zooplankton    ', &
+            'large migrating zooplankton     ', 'small tunicates                 ', &
+            'large tunicates                 ' /)
 
     !   The following vardesc types contain a package of metadata about each tracer,
     ! including, in order, the following elements: name; longname; horizontal
@@ -1011,53 +1022,73 @@ module COBALT_reg_diag
 
     vardesc_temp = vardesc("jzloss_n_Smz","Small zooplankton nitrogen loss to zooplankton",&
                            'h','L','s','mol N kg-1 s-1','f')
-    zoo(1)%id_jzloss_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(SMZ)%id_jzloss_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jzloss_n_Mdz","Medium-sized zooplankton nitrogen loss to zooplankton",&
                            'h','L','s','mol N kg-1 s-1','f')
-    zoo(2)%id_jzloss_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(MDZ)%id_jzloss_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jzloss_n_Lgz","Large zooplankton nitrogen loss to zooplankton",&
                            'h','L','s','mol N kg-1 s-1','f')
-    zoo(3)%id_jzloss_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(LGZ)%id_jzloss_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jzloss_n_vmMdz","Medium-sized migrating zooplankton nitrogen loss to zooplankton",&
                            'h','L','s','mol N kg-1 s-1','f')
-    zoo(4)%id_jzloss_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(VMMDZ)%id_jzloss_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jzloss_n_vmLgz","Large migratingzooplankton nitrogen loss to zooplankton",&
                            'h','L','s','mol N kg-1 s-1','f')
-    zoo(5)%id_jzloss_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(VMLGZ)%id_jzloss_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("jzloss_n_Smt","Small tunicate nitrogen loss to zooplankton",&
+                           'h','L','s','mol N kg-1 s-1','f')
+    zoo(SMT)%id_jzloss_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("jzloss_n_Lgt","Large tunicate nitrogen loss to zooplankton",&
+                           'h','L','s','mol N kg-1 s-1','f')
+    zoo(LGT)%id_jzloss_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
 
     vardesc_temp = vardesc("jzloss_p_Smz","Small zooplankton phosphorus loss to zooplankton",&
                            'h','L','s','mol P kg-1 s-1','f')
-    zoo(1)%id_jzloss_p = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(SMZ)%id_jzloss_p = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jzloss_p_Mdz","Medium-sized zooplankton phosphorus loss to zooplankton",&
                            'h','L','s','mol P kg-1 s-1','f')
-    zoo(2)%id_jzloss_p = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(MDZ)%id_jzloss_p = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jzloss_p_Lgz","Large zooplankton phosphorus loss to zooplankton",&
                            'h','L','s','mol P kg-1 s-1','f')
-    zoo(3)%id_jzloss_p = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(LGZ)%id_jzloss_p = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jzloss_p_vmMdz","Medium-sized migrating zooplankton phosphorus loss to zooplankton",&
                            'h','L','s','mol P kg-1 s-1','f')
-    zoo(4)%id_jzloss_p = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(VMMDZ)%id_jzloss_p = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jzloss_p_vmLgz","Large migrating zooplankton phosphorus loss to zooplankton",&
                            'h','L','s','mol P kg-1 s-1','f')
-    zoo(5)%id_jzloss_p = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(VMLGZ)%id_jzloss_p = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("jzloss_p_Smt","Small tunicate phosphorus loss to zooplankton",&
+                           'h','L','s','mol P kg-1 s-1','f')
+    zoo(SMT)%id_jzloss_p = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("jzloss_p_Lgt","Large tunicate phosphorus loss to zooplankton",&
+                           'h','L','s','mol P kg-1 s-1','f')
+    zoo(LGT)%id_jzloss_p = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     !
@@ -1066,54 +1097,74 @@ module COBALT_reg_diag
 
     vardesc_temp = vardesc("jhploss_n_Smz","Small zooplankton nitrogen loss to higher predators",&
                            'h','L','s','mol N kg-1 s-1','f')
-    zoo(1)%id_jhploss_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(SMZ)%id_jhploss_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jhploss_n_Mdz","Medium-sized zooplankton nitrogen loss to higher predators",&
                            'h','L','s','mol N kg-1 s-1','f')
-    zoo(2)%id_jhploss_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(MDZ)%id_jhploss_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jhploss_n_Lgz","Large zooplankton nitrogen loss to higher predators",&
                            'h','L','s','mol N kg-1 s-1','f')
-    zoo(3)%id_jhploss_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(LGZ)%id_jhploss_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jhploss_n_vmMdz","Medium-sized migrating zooplankton nitrogen loss to higher predators",&
                            'h','L','s','mol N kg-1 s-1','f')
-    zoo(4)%id_jhploss_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(VMMDZ)%id_jhploss_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jhploss_n_vmLgz","Large migrating zooplankton nitrogen loss to higher predators",&
                            'h','L','s','mol N kg-1 s-1','f')
-    zoo(5)%id_jhploss_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(VMLGZ)%id_jhploss_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("jhploss_n_Smt","Small tunicate nitrogen loss to higher predators",&
+                           'h','L','s','mol N kg-1 s-1','f')
+    zoo(SMT)%id_jhploss_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("jhploss_n_Lgt","Large tunicate nitrogen loss to higher predators",&
+                           'h','L','s','mol N kg-1 s-1','f')
+    zoo(LGT)%id_jhploss_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
 
 
     vardesc_temp = vardesc("jhploss_p_Smz","Small zooplankton phosphorus loss to higher predators",&
                            'h','L','s','mol P kg-1 s-1','f')
-    zoo(1)%id_jhploss_p = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(SMZ)%id_jhploss_p = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jhploss_p_Mdz","Medium-sized zooplankton phosphorus loss to higher predators",&
                            'h','L','s','mol P kg-1 s-1','f')
-    zoo(2)%id_jhploss_p = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(MDZ)%id_jhploss_p = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jhploss_p_Lgz","Large zooplankton phosphorus loss to higher predators",&
                            'h','L','s','mol P kg-1 s-1','f')
-    zoo(3)%id_jhploss_p = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(LGZ)%id_jhploss_p = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jhploss_p_vmMdz","Medium-sized migrating zooplankton phosphorus loss to higher predators",&
                            'h','L','s','mol P kg-1 s-1','f')
-    zoo(4)%id_jhploss_p = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(VMMDZ)%id_jhploss_p = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jhploss_p_vmLgz","Large migrating zooplankton phosphorus loss to higher predators",&
                            'h','L','s','mol P kg-1 s-1','f')
-    zoo(5)%id_jhploss_p = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(VMLGZ)%id_jhploss_p = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("jhploss_p_Smt","Small tunicate phosphorus loss to higher predators",&
+                           'h','L','s','mol P kg-1 s-1','f')
+    zoo(SMT)%id_jhploss_p = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("jhploss_p_Lgt","Large tunicate phosphorus loss to higher predators",&
+                           'h','L','s','mol P kg-1 s-1','f')
+    zoo(LGT)%id_jhploss_p = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     !
@@ -1122,106 +1173,146 @@ module COBALT_reg_diag
 
     vardesc_temp = vardesc("jingest_n_Smz","Ingestion of nitrogen by small zooplankton",&
                            'h','L','s','mol N kg-1 s-1','f')
-    zoo(1)%id_jingest_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(SMZ)%id_jingest_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jingest_n_Mdz","Ingestion of nitrogen by medium-sized zooplankton",&
                            'h','L','s','mol N kg-1 s-1','f')
-    zoo(2)%id_jingest_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(MDZ)%id_jingest_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jingest_n_Lgz","Ingestion of nitrogen by large zooplankton",&
                            'h','L','s','mol N kg-1 s-1','f')
-    zoo(3)%id_jingest_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(LGZ)%id_jingest_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
      vardesc_temp = vardesc("jingest_n_vmMdz","Ingestion of nitrogen by medium-sized migrating zooplankton",&
                            'h','L','s','mol N kg-1 s-1','f')
-    zoo(4)%id_jingest_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(VMMDZ)%id_jingest_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jingest_n_vmLgz","Ingestion of nitrogen by large migrating zooplankton",&
                            'h','L','s','mol N kg-1 s-1','f')
-    zoo(5)%id_jingest_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(VMLGZ)%id_jingest_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("jingest_n_Smt","Ingestion of nitrogen by small tunicates",&
+                           'h','L','s','mol N kg-1 s-1','f')
+    zoo(SMT)%id_jingest_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("jingest_n_Lgt","Ingestion of nitrogen by large tunicates",&
+                           'h','L','s','mol N kg-1 s-1','f')
+    zoo(LGT)%id_jingest_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
 
 
     vardesc_temp = vardesc("jingest_p_Smz","Ingestion of phosphorous by small zooplankton", &
                            'h','L','s','mol P kg-1 s-1','f')
-    zoo(1)%id_jingest_p = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(SMZ)%id_jingest_p = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jingest_p_Mdz","Ingestion of phosphorous by medium-sized zooplankton",&
                            'h','L','s','mol P kg-1 s-1','f')
-    zoo(2)%id_jingest_p = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(MDZ)%id_jingest_p = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jingest_p_Lgz","Ingestion of phosphorous by large zooplankton",&
                            'h','L','s','mol P kg-1 s-1','f')
-    zoo(3)%id_jingest_p = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(LGZ)%id_jingest_p = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jingest_p_vmMdz","Ingestion of phosphorous by medium-sized migrating zooplankton",&
                            'h','L','s','mol P kg-1 s-1','f')
-    zoo(4)%id_jingest_p = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(VMMDZ)%id_jingest_p = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jingest_p_vmLgz","Ingestion of phosphorous by large migrating zooplankton",&
                            'h','L','s','mol P kg-1 s-1','f')
-    zoo(5)%id_jingest_p = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(VMLGZ)%id_jingest_p = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("jingest_p_Smt","Ingestion of phosphorous by small tunicates",&
+                           'h','L','s','mol P kg-1 s-1','f')
+    zoo(SMT)%id_jingest_p = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("jingest_p_Lgt","Ingestion of phosphorous by large tunicates",&
+                           'h','L','s','mol P kg-1 s-1','f')
+    zoo(LGT)%id_jingest_p = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
 
     vardesc_temp = vardesc("jingest_sio2_Smz","Ingestion of sio2 by small zooplankton",&
                            'h','L','s','mol SiO2 kg-1 s-1','f')
-    zoo(1)%id_jingest_sio2 = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(SMZ)%id_jingest_sio2 = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jingest_sio2_Mdz","Ingestion of sio2 by medium-sized zooplankton",&
                            'h','L','s','mol SiO2 kg-1 s-1','f')
-    zoo(2)%id_jingest_sio2 = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(MDZ)%id_jingest_sio2 = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jingest_sio2_Lgz","Ingestion of sio2 by large zooplankton",&
                            'h','L','s','mol SiO2 kg-1 s-1','f')
-    zoo(3)%id_jingest_sio2 = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(LGZ)%id_jingest_sio2 = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
      vardesc_temp = vardesc("jingest_sio2_vmMdz","Ingestion of sio2 by medium-sized migrating zooplankton",&
                            'h','L','s','mol SiO2 kg-1 s-1','f')
-    zoo(4)%id_jingest_sio2 = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(VMMDZ)%id_jingest_sio2 = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jingest_sio2_vmLgz","Ingestion of sio2 by large migrating zooplankton",&
                            'h','L','s','mol SiO2 kg-1 s-1','f')
-    zoo(5)%id_jingest_sio2 = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(VMLGZ)%id_jingest_sio2 = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("jingest_sio2_Smt","Ingestion of sio2 by small tunicates",&
+                           'h','L','s','mol SiO2 kg-1 s-1','f')
+    zoo(SMT)%id_jingest_sio2 = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("jingest_sio2_Lgt","Ingestion of sio2 by large tunicates",&
+                           'h','L','s','mol SiO2 kg-1 s-1','f')
+    zoo(LGT)%id_jingest_sio2 = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
      
 
     vardesc_temp = vardesc("jingest_fe_Smz","Ingestion of Fe by small zooplankton",&
                    'h','L','s','mol Fe kg-1 s-1','f')
-    zoo(1)%id_jingest_fe = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(SMZ)%id_jingest_fe = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jingest_fe_Mdz","Ingestion of Fe by medium-sized zooplankton",&
                            'h','L','s','mol Fe kg-1 s-1','f')
-    zoo(2)%id_jingest_fe = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(MDZ)%id_jingest_fe = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jingest_fe_Lgz","Ingestion of Fe by large zooplankton",&
                            'h','L','s','mol Fe kg-1 s-1','f')
-    zoo(3)%id_jingest_fe = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(LGZ)%id_jingest_fe = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jingest_fe_vmMdz","Ingestion of Fe by medium-sized migrating zooplankton",&
                            'h','L','s','mol Fe kg-1 s-1','f')
-    zoo(4)%id_jingest_fe = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(VMMDZ)%id_jingest_fe = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jingest_fe_vmLgz","Ingestion of Fe by large migrating zooplankton",&
                            'h','L','s','mol Fe kg-1 s-1','f')
-    zoo(5)%id_jingest_fe = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(VMLGZ)%id_jingest_fe = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("jingest_fe_Smt","Ingestion of Fe by small tunicates",&
+                           'h','L','s','mol Fe kg-1 s-1','f')
+    zoo(SMT)%id_jingest_fe = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("jingest_fe_Lgt","Ingestion of Fe by large tunicates",&
+                           'h','L','s','mol Fe kg-1 s-1','f')
+    zoo(LGT)%id_jingest_fe = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     !
@@ -1230,134 +1321,184 @@ module COBALT_reg_diag
 
     vardesc_temp = vardesc("jprod_ndet_Smz","Production of nitrogen detritus by small zooplankton",&
                    'h','L','s','mol N kg-1 s-1','f')
-    zoo(1)%id_jprod_ndet = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(SMZ)%id_jprod_ndet = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_ndet_Mdz","Production of nitrogen detritus by medium zooplankton",&
                    'h','L','s','mol N kg-1 s-1','f')
-    zoo(2)%id_jprod_ndet = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(MDZ)%id_jprod_ndet = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_ndet_Lgz","Production of nitrogen detritus by large zooplankton",&
                    'h','L','s','mol N kg-1 s-1','f')
-    zoo(3)%id_jprod_ndet = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(LGZ)%id_jprod_ndet = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_ndet_vmMdz","Production of nitrogen detritus by medium migrating zooplankton",&
                    'h','L','s','mol N kg-1 s-1','f')
-    zoo(4)%id_jprod_ndet = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(VMMDZ)%id_jprod_ndet = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_ndet_vmLgz","Production of nitrogen detritus by large migrating zooplankton",&
                    'h','L','s','mol N kg-1 s-1','f')
-    zoo(5)%id_jprod_ndet = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(VMLGZ)%id_jprod_ndet = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("jprod_ndet_Smt","Production of nitrogen detritus by small tunicates",&
+                   'h','L','s','mol N kg-1 s-1','f')
+    zoo(SMT)%id_jprod_ndet = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("jprod_ndet_Lgt","Production of nitrogen detritus by large tunicates",&
+                   'h','L','s','mol N kg-1 s-1','f')
+    zoo(LGT)%id_jprod_ndet = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
 
          
     vardesc_temp = vardesc("jprod_pdet_Smz","Production of phosphorous detritus by small zooplankton",&
                    'h','L','s','mol P kg-1 s-1','f')
-    zoo(1)%id_jprod_pdet = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(SMZ)%id_jprod_pdet = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_pdet_Mdz","Production of phosphorous detritus by medium zooplankton",&
                    'h','L','s','mol P kg-1 s-1','f')
-    zoo(2)%id_jprod_pdet = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(MDZ)%id_jprod_pdet = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_pdet_Lgz","Production of phosphorous detritus by large zooplankton",&
                    'h','L','s','mol P kg-1 s-1','f')
-    zoo(3)%id_jprod_pdet = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(LGZ)%id_jprod_pdet = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_pdet_vmMdz","Production of phosphorous detritus by medium migrating zooplankton",&
                    'h','L','s','mol P kg-1 s-1','f')
-    zoo(4)%id_jprod_pdet = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(VMMDZ)%id_jprod_pdet = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_pdet_vmLgz","Production of phosphorous detritus by large migrating zooplankton",&
                    'h','L','s','mol P kg-1 s-1','f')
-    zoo(5)%id_jprod_pdet = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(VMLGZ)%id_jprod_pdet = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1) 
+
+    vardesc_temp = vardesc("jprod_pdet_Smt","Production of phosphorous detritus by small tunicates",&
+                   'h','L','s','mol P kg-1 s-1','f')
+    zoo(SMT)%id_jprod_pdet = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1) 
+
+    vardesc_temp = vardesc("jprod_pdet_Lgt","Production of phosphorous detritus by large tunicates",&
+                   'h','L','s','mol P kg-1 s-1','f')
+    zoo(LGT)%id_jprod_pdet = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1) 
 
 
 
     vardesc_temp = vardesc("jprod_sidet_Smz","Production of opal detritus by small zooplankton",&
                    'h','L','s','mol SiO2 kg-1 s-1','f')
-    zoo(1)%id_jprod_sidet = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(SMZ)%id_jprod_sidet = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_sidet_Mdz","Production of opal detritus by medium zooplankton",&
                    'h','L','s','mol SiO2 kg-1 s-1','f')
-    zoo(2)%id_jprod_sidet = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(MDZ)%id_jprod_sidet = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_sidet_Lgz","Production of opal detritus by large zooplankton",&
                    'h','L','s','mol SiO2 kg-1 s-1','f')
-    zoo(3)%id_jprod_sidet = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(LGZ)%id_jprod_sidet = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_sidet_vmMdz","Production of opal detritus by medium migrating zooplankton",&
                    'h','L','s','mol SiO2 kg-1 s-1','f')
-    zoo(4)%id_jprod_sidet = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(VMMDZ)%id_jprod_sidet = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_sidet_vmLgz","Production of opal detritus by large migrating zooplankton",&
                    'h','L','s','mol SiO2 kg-1 s-1','f')
-    zoo(5)%id_jprod_sidet = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(VMLGZ)%id_jprod_sidet = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("jprod_sidet_Smt","Production of opal detritus by small tunicates",&
+                   'h','L','s','mol SiO2 kg-1 s-1','f')
+    zoo(SMT)%id_jprod_sidet = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("jprod_sidet_Lgt","Production of opal detritus by large tunicates",&
+                   'h','L','s','mol SiO2 kg-1 s-1','f')
+    zoo(LGT)%id_jprod_sidet = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
 
 
     vardesc_temp = vardesc("jprod_sio4_Smz","Production of sio4 through grazing/dissolution",&
                    'h','L','s','mol SiO4 kg-1 s-1','f')
-    zoo(1)%id_jprod_sio4 = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(SMZ)%id_jprod_sio4 = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_sio4_Mdz","Production of sio4 through grazing/dissolution",&
                    'h','L','s','mol SiO4 kg-1 s-1','f')
-    zoo(2)%id_jprod_sio4 = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(MDZ)%id_jprod_sio4 = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_sio4_Lgz","Production of sio4 through grazing/dissolution",&
                    'h','L','s','mol SiO4 kg-1 s-1','f')
-    zoo(3)%id_jprod_sio4 = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(LGZ)%id_jprod_sio4 = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_sio4_vmMdz","Production of sio4 through grazing/dissolution",&
                    'h','L','s','mol SiO4 kg-1 s-1','f')
-    zoo(4)%id_jprod_sio4 = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(VMMDZ)%id_jprod_sio4 = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_sio4_vmLgz","Production of sio4 through grazing/dissolution",&
                    'h','L','s','mol SiO4 kg-1 s-1','f')
-    zoo(5)%id_jprod_sio4 = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(VMLGZ)%id_jprod_sio4 = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("jprod_sio4_Smt","Production of sio4 through grazing/dissolution",&
+                   'h','L','s','mol SiO4 kg-1 s-1','f')
+    zoo(SMT)%id_jprod_sio4 = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("jprod_sio4_Lgt","Production of sio4 through grazing/dissolution",&
+                   'h','L','s','mol SiO4 kg-1 s-1','f')
+    zoo(LGT)%id_jprod_sio4 = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
 
     vardesc_temp = vardesc("jprod_fedet_Smz","Production of iron detritus by small zooplankton",&
                    'h','L','s','mol Fe kg-1 s-1','f')
-    zoo(1)%id_jprod_fedet = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(SMZ)%id_jprod_fedet = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_fedet_Mdz","Production of iron detritus by medium zooplankton",&
                    'h','L','s','mol Fe kg-1 s-1','f')
-    zoo(2)%id_jprod_fedet = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(MDZ)%id_jprod_fedet = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_fedet_Lgz","Production of iron detritus by large zooplankton",&
                    'h','L','s','mol Fe kg-1 s-1','f')
-    zoo(3)%id_jprod_fedet = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(LGZ)%id_jprod_fedet = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_fedet_vmMdz","Production of iron detritus by medium migrating zooplankton",&
                    'h','L','s','mol Fe kg-1 s-1','f')
-    zoo(4)%id_jprod_fedet = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(VMMDZ)%id_jprod_fedet = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_fedet_vmLgz","Production of iron detritus by large migrating zooplankton",&
                    'h','L','s','mol Fe kg-1 s-1','f')
-    zoo(5)%id_jprod_fedet = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(VMLGZ)%id_jprod_fedet = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("jprod_fedet_Smt","Production of iron detritus by small tunicates",&
+                   'h','L','s','mol Fe kg-1 s-1','f')
+    zoo(SMT)%id_jprod_fedet = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("jprod_fedet_Lgt","Production of iron detritus by large tunicates",&
+                   'h','L','s','mol Fe kg-1 s-1','f')
+    zoo(LGT)%id_jprod_fedet = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     !
@@ -1380,235 +1521,325 @@ module COBALT_reg_diag
     ! Labile dissolved organic nitrogen
     vardesc_temp = vardesc("jprod_ldon_Smz","Production of labile dissolved organic nitrogen by small zooplankton",&
                    'h','L','s','mol N kg-1 s-1','f')
-    zoo(1)%id_jprod_ldon = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(SMZ)%id_jprod_ldon = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_ldon_Mdz","Production of labile dissolved organic nitrogen by medium zooplankton",&
                    'h','L','s','mol N kg-1 s-1','f')
-    zoo(2)%id_jprod_ldon = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(MDZ)%id_jprod_ldon = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_ldon_Lgz","Production of labile dissolved organic nitrogen by large zooplankton",&
                    'h','L','s','mol N kg-1 s-1','f')
-    zoo(3)%id_jprod_ldon = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(LGZ)%id_jprod_ldon = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_ldon_vmMdz","Production of labile dissolved organic nitrogen by medium migrating zooplankton",&
                    'h','L','s','mol N kg-1 s-1','f')
-    zoo(4)%id_jprod_ldon = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(VMMDZ)%id_jprod_ldon = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_ldon_vmLgz","Production of labile dissolved organic nitrogen by large migrating zooplankton",&
                    'h','L','s','mol N kg-1 s-1','f')
-    zoo(5)%id_jprod_ldon = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(VMLGZ)%id_jprod_ldon = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("jprod_ldon_Smt","Production of labile dissolved organic nitrogen by small tunicates",&
+                   'h','L','s','mol N kg-1 s-1','f')
+    zoo(SMT)%id_jprod_ldon = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("jprod_ldon_Lgt","Production of labile dissolved organic nitrogen by large tunicates",&
+                   'h','L','s','mol N kg-1 s-1','f')
+    zoo(LGT)%id_jprod_ldon = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     ! Labile dissolved organic phosphorous
     vardesc_temp = vardesc("jprod_ldop_Smz","Production of labile dissolved organic phosphorous by small zooplankton",&
                    'h','L','s','mol P kg-1 s-1','f')
-    zoo(1)%id_jprod_ldop = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(SMZ)%id_jprod_ldop = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_ldop_Mdz","Production of labile dissolved organic phosphorous by medium zooplankton",&
                    'h','L','s','mol P kg-1 s-1','f')
-    zoo(2)%id_jprod_ldop = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(MDZ)%id_jprod_ldop = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_ldop_Lgz","Production of labile dissolved organic phosphorous by large zooplankton",&
                    'h','L','s','mol P kg-1 s-1','f')
-    zoo(3)%id_jprod_ldop = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(LGZ)%id_jprod_ldop = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_ldop_vmMdz","Production of labile dissolved organic phosphorous by medium migrating zooplankton",&
                    'h','L','s','mol P kg-1 s-1','f')
-    zoo(4)%id_jprod_ldop = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(VMMDZ)%id_jprod_ldop = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_ldop_vmLgz","Production of labile dissolved organic phosphorous by large migrating zooplankton",&
                    'h','L','s','mol P kg-1 s-1','f')
-    zoo(5)%id_jprod_ldop = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(VMLGZ)%id_jprod_ldop = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("jprod_ldop_Smt","Production of labile dissolved organic phosphorous by small tunicates",&
+                   'h','L','s','mol P kg-1 s-1','f')
+    zoo(SMT)%id_jprod_ldop = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("jprod_ldop_Lgt","Production of labile dissolved organic phosphorous by large tunicates",&
+                   'h','L','s','mol P kg-1 s-1','f')
+    zoo(LGT)%id_jprod_ldop = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     ! Refractory dissolved organic nitrogen
     vardesc_temp = vardesc("jprod_srdon_Smz","Production of semi-refractory dissolved organic nitrogen by small zooplankton",&
                    'h','L','s','mol N kg-1 s-1','f')
-    zoo(1)%id_jprod_srdon = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(SMZ)%id_jprod_srdon = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_srdon_Mdz","Production of semi-refractory dissolved organic nitrogen by medium zooplankton",&
                    'h','L','s','mol N kg-1 s-1','f')
-    zoo(2)%id_jprod_srdon = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(MDZ)%id_jprod_srdon = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_srdon_Lgz","Production of semi-refractory dissolved organic nitrogen by large zooplankton",&
                    'h','L','s','mol N kg-1 s-1','f')
-    zoo(3)%id_jprod_srdon = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(LGZ)%id_jprod_srdon = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_srdon_vmMdz","Production of semi-refractory dissolved organic nitrogen by medium migrating zooplankton",&
                    'h','L','s','mol N kg-1 s-1','f')
-    zoo(4)%id_jprod_srdon = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(VMMDZ)%id_jprod_srdon = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_srdon_vmLgz","Production of semi-refractory dissolved organic nitrogen by large migrating zooplankton",&
                    'h','L','s','mol N kg-1 s-1','f')
-    zoo(5)%id_jprod_srdon = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(VMLGZ)%id_jprod_srdon = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("jprod_srdon_Smt","Production of semi-refractory dissolved organic nitrogen by small tunicates",&
+                   'h','L','s','mol N kg-1 s-1','f')
+    zoo(SMT)%id_jprod_srdon = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("jprod_srdon_Lgt","Production of semi-refractory dissolved organic nitrogen by large tunicates",&
+                   'h','L','s','mol N kg-1 s-1','f')
+    zoo(LGT)%id_jprod_srdon = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     ! Labile dissolved organic phosphorous
     vardesc_temp = vardesc("jprod_srdop_Smz","Production of semi-refractory dissolved organic phosphorous by small zooplankton",&
                    'h','L','s','mol P kg-1 s-1','f')
-    zoo(1)%id_jprod_srdop = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(SMZ)%id_jprod_srdop = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_srdop_Mdz","Production of semi-refractory dissolved organic phosphorous by medium zooplankton",&
                    'h','L','s','mol P kg-1 s-1','f')
-    zoo(2)%id_jprod_srdop = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(MDZ)%id_jprod_srdop = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_srdop_Lgz","Production of semi-refractory dissolved organic phosphorous by large zooplankton",&
                    'h','L','s','mol P kg-1 s-1','f')
-    zoo(3)%id_jprod_srdop = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(LGZ)%id_jprod_srdop = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_srdop_vmMdz","Production of semi-refractory dissolved organic phosphorous by medium migrating zooplankton",&
                    'h','L','s','mol P kg-1 s-1','f')
-    zoo(4)%id_jprod_srdop = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(VMMDZ)%id_jprod_srdop = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_srdop_vmLgz","Production of semi-refractory dissolved organic phosphorous by large migrating zooplankton",&
                    'h','L','s','mol P kg-1 s-1','f')
-    zoo(5)%id_jprod_srdop = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(VMLGZ)%id_jprod_srdop = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("jprod_srdop_Smt","Production of semi-refractory dissolved organic phosphorous by small tunicates",&
+                   'h','L','s','mol P kg-1 s-1','f')
+    zoo(SMT)%id_jprod_srdop = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("jprod_srdop_Lgt","Production of semi-refractory dissolved organic phosphorous by large tunicates",&
+                   'h','L','s','mol P kg-1 s-1','f')
+    zoo(LGT)%id_jprod_srdop = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     ! semi-labile dissolved organic nitrogen
     vardesc_temp = vardesc("jprod_sldon_Smz","Production of semi-labile dissolved organic nitrogen by small zooplankton",&
                    'h','L','s','mol N kg-1 s-1','f')
-    zoo(1)%id_jprod_sldon = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(SMZ)%id_jprod_sldon = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_sldon_Mdz","Production of semi-labile dissolved organic nitrogen by medium zooplankton",&
                    'h','L','s','mol N kg-1 s-1','f')
-    zoo(2)%id_jprod_sldon = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(MDZ)%id_jprod_sldon = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_sldon_Lgz","Production of semi-labile dissolved organic nitrogen by large zooplankton",&
                    'h','L','s','mol N kg-1 s-1','f')
-    zoo(3)%id_jprod_sldon = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(LGZ)%id_jprod_sldon = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_sldon_vmMdz","Production of semi-labile dissolved organic nitrogen by medium migrating zooplankton",&
                    'h','L','s','mol N kg-1 s-1','f')
-    zoo(4)%id_jprod_sldon = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(VMMDZ)%id_jprod_sldon = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_sldon_vmLgz","Production of semi-labile dissolved organic nitrogen by large migrating zooplankton",&
                    'h','L','s','mol N kg-1 s-1','f')
-    zoo(5)%id_jprod_sldon = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(VMLGZ)%id_jprod_sldon = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("jprod_sldon_Smt","Production of semi-labile dissolved organic nitrogen by small tunicates",&
+                   'h','L','s','mol N kg-1 s-1','f')
+    zoo(SMT)%id_jprod_sldon = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("jprod_sldon_Lgt","Production of semi-labile dissolved organic nitrogen by large tunicates",&
+                   'h','L','s','mol N kg-1 s-1','f')
+    zoo(LGT)%id_jprod_sldon = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     ! semi-labile dissolved organic phosphorous
     vardesc_temp = vardesc("jprod_sldop_Smz","Production of semi-labile dissolved organic phosphorous by small zooplankton",&
                    'h','L','s','mol P kg-1 s-1','f')
-    zoo(1)%id_jprod_sldop = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(SMZ)%id_jprod_sldop = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_sldop_Mdz","Production of semi-labile dissolved organic phosphorous by medium zooplankton",&
                    'h','L','s','mol P kg-1 s-1','f')
-    zoo(2)%id_jprod_sldop = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(MDZ)%id_jprod_sldop = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_sldop_Lgz","Production of semi-labile dissolved organic phosphorous by large zooplankton",&
                    'h','L','s','mol P kg-1 s-1','f')
-    zoo(3)%id_jprod_sldop = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(LGZ)%id_jprod_sldop = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_sldop_vmMdz","Production of semi-labile dissolved organic phosphorous by medium migrating zooplankton",&
                    'h','L','s','mol P kg-1 s-1','f')
-    zoo(4)%id_jprod_sldop = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(VMMDZ)%id_jprod_sldop = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_sldop_vmLgz","Production of semi-labile dissolved organic phosphorous by large migrating zooplankton",&
                    'h','L','s','mol P kg-1 s-1','f')
-    zoo(5)%id_jprod_sldop = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(VMLGZ)%id_jprod_sldop = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("jprod_sldop_Smt","Production of semi-labile dissolved organic phosphorous by small tunicates",&
+                   'h','L','s','mol P kg-1 s-1','f')
+    zoo(SMT)%id_jprod_sldop = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("jprod_sldop_Lgt","Production of semi-labile dissolved organic phosphorous by large tunicates",&
+                   'h','L','s','mol P kg-1 s-1','f')
+    zoo(LGT)%id_jprod_sldop = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     ! dissolved iron
     vardesc_temp = vardesc("jprod_fed_Smz","Production of dissolved iron by small zooplankton",&
                    'h','L','s','mol Fe kg-1 s-1','f')
-    zoo(1)%id_jprod_fed = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(SMZ)%id_jprod_fed = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_fed_Mdz","Production of dissolved iron by medium-sized zooplankton",&
                    'h','L','s','mol Fe kg-1 s-1','f')
-    zoo(2)%id_jprod_fed = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(MDZ)%id_jprod_fed = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_fed_Lgz","Production of dissolved iron by large zooplankton",&
                    'h','L','s','mol Fe kg-1 s-1','f')
-    zoo(3)%id_jprod_fed = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(LGZ)%id_jprod_fed = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
      vardesc_temp = vardesc("jprod_fed_vmMdz","Production of dissolved iron by medium migrating zooplankton",&
                    'h','L','s','mol Fe kg-1 s-1','f')
-    zoo(4)%id_jprod_fed = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(VMMDZ)%id_jprod_fed = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_fed_vmLgz","Production of dissolved iron by large migrating zooplankton",&
                    'h','L','s','mol Fe kg-1 s-1','f')
-    zoo(5)%id_jprod_fed = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(VMLGZ)%id_jprod_fed = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("jprod_fed_Smt","Production of dissolved iron by small tunicates",&
+                   'h','L','s','mol Fe kg-1 s-1','f')
+    zoo(SMT)%id_jprod_fed = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("jprod_fed_Lgt","Production of dissolved iron by large tunicates",&
+                   'h','L','s','mol Fe kg-1 s-1','f')
+    zoo(LGT)%id_jprod_fed = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     ! phosphate
     vardesc_temp = vardesc("jprod_po4_Smz","Production of phosphate by small zooplankton",&
                    'h','L','s','mol PO4 kg-1 s-1','f')
-    zoo(1)%id_jprod_po4 = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(SMZ)%id_jprod_po4 = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_po4_Mdz","Production of phosphate by medium-sized zooplankton",&
                    'h','L','s','mol PO4 kg-1 s-1','f')
-    zoo(2)%id_jprod_po4 = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(MDZ)%id_jprod_po4 = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_po4_Lgz","Production of phosphate by large zooplankton",&
                    'h','L','s','mol PO4 kg-1 s-1','f')
-    zoo(3)%id_jprod_po4 = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(LGZ)%id_jprod_po4 = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
      vardesc_temp = vardesc("jprod_po4_vmMdz","Production of phosphate by medium migrating zooplankton",&
                    'h','L','s','mol PO4 kg-1 s-1','f')
-    zoo(4)%id_jprod_po4 = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(VMMDZ)%id_jprod_po4 = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_po4_vmLgz","Production of phosphate by large migrating zooplankton",&
                    'h','L','s','mol PO4 kg-1 s-1','f')
-    zoo(5)%id_jprod_po4 = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(VMLGZ)%id_jprod_po4 = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("jprod_po4_Smt","Production of phosphate by small tunicates",&
+                   'h','L','s','mol PO4 kg-1 s-1','f')
+    zoo(SMT)%id_jprod_po4 = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("jprod_po4_Lgt","Production of phosphate by large tunicates",&
+                   'h','L','s','mol PO4 kg-1 s-1','f')
+    zoo(LGT)%id_jprod_po4 = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     ! ammonia
     vardesc_temp = vardesc("jprod_nh4_Smz","Production of ammonia by small zooplankton",&
                    'h','L','s','mol NH4 kg-1 s-1','f')
-    zoo(1)%id_jprod_nh4 = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(SMZ)%id_jprod_nh4 = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_nh4_Mdz","Production of ammonia by medium-sized zooplankton",&
                    'h','L','s','mol NH4 kg-1 s-1','f')
-    zoo(2)%id_jprod_nh4 = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(MDZ)%id_jprod_nh4 = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_nh4_Lgz","Production of ammonia by large zooplankton",&
                    'h','L','s','mol NH4 kg-1 s-1','f')
-    zoo(3)%id_jprod_nh4 = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(LGZ)%id_jprod_nh4 = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_nh4_vmMdz","Production of ammonia by medium migrating zooplankton",&
                    'h','L','s','mol NH4 kg-1 s-1','f')
-    zoo(4)%id_jprod_nh4 = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(VMMDZ)%id_jprod_nh4 = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_nh4_vmLgz","Production of ammonia by large migrating zooplankton",&
                    'h','L','s','mol NH4 kg-1 s-1','f')
-    zoo(5)%id_jprod_nh4 = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(VMLGZ)%id_jprod_nh4 = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("jprod_nh4_Smt","Production of ammonia by small tunicates",&
+                   'h','L','s','mol NH4 kg-1 s-1','f')
+    zoo(SMT)%id_jprod_nh4 = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("jprod_nh4_Lgt","Production of ammonia by large tunicates",&
+                   'h','L','s','mol NH4 kg-1 s-1','f')
+    zoo(LGT)%id_jprod_nh4 = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     !
@@ -1617,138 +1848,190 @@ module COBALT_reg_diag
 
     vardesc_temp = vardesc("jprod_nsmz","Production of new biomass (nitrogen) by small zooplankton",&
                            'h','L','s','mol N kg-1 s-1','f')
-    zoo(1)%id_jprod_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(SMZ)%id_jprod_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_nmdz","Production of new biomass (nitrogen) by medium-sized zooplankton",&
                            'h','L','s','mol N kg-1 s-1','f')
-    zoo(2)%id_jprod_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(MDZ)%id_jprod_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_nlgz","Production of new biomass (nitrogen) by large zooplankton",&
                            'h','L','s','mol N kg-1 s-1','f')
-    zoo(3)%id_jprod_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(LGZ)%id_jprod_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_nvmmdz","Production of new biomass (nitrogen) by medium-sized migrating zooplankton",&
                            'h','L','s','mol N kg-1 s-1','f')
-    zoo(4)%id_jprod_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(VMMDZ)%id_jprod_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_nvmlgz","Production of new biomass (nitrogen) by large migrating zooplankton",&
                            'h','L','s','mol N kg-1 s-1','f')
-    zoo(5)%id_jprod_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(VMLGZ)%id_jprod_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("jprod_nsmt","Production of new biomass (nitrogen) by small tunicates",&
+                           'h','L','s','mol N kg-1 s-1','f')
+    zoo(SMT)%id_jprod_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("jprod_nlgt","Production of new biomass (nitrogen) by large tunicates",&
+                           'h','L','s','mol N kg-1 s-1','f')
+    zoo(LGT)%id_jprod_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
          
     vardesc_temp = vardesc("o2lim_Smz","Oxygen limitation of small zooplankton",'h','L','s','dimensionless','f')
-    zoo(1)%id_o2lim = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(SMZ)%id_o2lim = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("o2lim_Mdz","Oxygen limitation of medium-sized zooplankton",'h','L','s','dimensionless','f')
-    zoo(2)%id_o2lim = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(MDZ)%id_o2lim = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("o2lim_Lgz","Oxygen limitation of large zooplankton",'h','L','s','dimensionless','f')
-    zoo(3)%id_o2lim = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(LGZ)%id_o2lim = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("o2lim_vmMdz","Oxygen limitation of medium-sized migrating zooplankton",'h','L','s','dimensionless','f')
-    zoo(4)%id_o2lim = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(VMMDZ)%id_o2lim = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("o2lim_vmlgz","Oxygen limitation of large migrating zooplankton",'h','L','s','dimensionless','f')
-    zoo(5)%id_o2lim = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(VMLGZ)%id_o2lim = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("o2lim_smt","Oxygen limitation of small tunicates",'h','L','s','dimensionless','f')
+    zoo(SMT)%id_o2lim = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("o2lim_lgt","Oxygen limitation of large tunicates",'h','L','s','dimensionless','f')
+    zoo(LGT)%id_o2lim = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
 
 
     vardesc_temp = vardesc("temp_lim_Smz","Temperature limitation of small zooplankton",'h','L','s','dimensionless','f')
-    zoo(1)%id_temp_lim = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(SMZ)%id_temp_lim = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("temp_lim_Mdz","Temperature limitation of medium-sized zooplankton",'h','L','s','dimensionless','f')
-    zoo(2)%id_temp_lim = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(MDZ)%id_temp_lim = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("temp_lim_Lgz","Temperature limitation of large zooplankton",'h','L','s','dimensionless','f')
-    zoo(3)%id_temp_lim = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(LGZ)%id_temp_lim = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
      
     vardesc_temp = vardesc("temp_lim_vmMdz","Temperature limitation of medium-sized migrating zooplankton",'h','L','s','dimensionless','f')
-    zoo(4)%id_temp_lim = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(VMMDZ)%id_temp_lim = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("temp_lim_vmlgz","Temperature limitation of large migrating zooplankton",'h','L','s','dimensionless','f')
-    zoo(5)%id_temp_lim = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(VMLGZ)%id_temp_lim = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("temp_lim_smt","Temperature limitation of small tunicates",'h','L','s','dimensionless','f')
+    zoo(SMT)%id_temp_lim = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("temp_lim_lgt","Temperature limitation of large tunicates",'h','L','s','dimensionless','f')
+    zoo(LGT)%id_temp_lim = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
 
     vardesc_temp = vardesc("vmove_Smz","Small zooplankton movement",'h','L','s','m s-1','f')
-    zoo(1)%id_vmove = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(SMZ)%id_vmove = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
           init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("vmove_Mdz","medium zooplankton movement",'h','L','s','m s-1','f')
-    zoo(2)%id_vmove = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(MDZ)%id_vmove = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
           init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("vmove_Lgz","Large zooplankton movement",'h','L','s','m s-1','f')
-    zoo(3)%id_vmove = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(LGZ)%id_vmove = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
           init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
  
     vardesc_temp = vardesc("vmove_vmMdz","Vertically migrating medium zooplankton movement",'h','L','s','m s-1','f')
-    zoo(4)%id_vmove = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(VMMDZ)%id_vmove = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
           init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("vmove_vmLgz","Vertically migrating large zooplankton movement",'h','L','s','m s-1','f')
-    zoo(5)%id_vmove = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(VMLGZ)%id_vmove = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("vmove_Smt","Vertically small tunicates movement",'h','L','s','m s-1','f')
+    zoo(SMT)%id_vmove = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("vmove_Lgt","Vertically large tunicates movement",'h','L','s','m s-1','f')
+    zoo(LGT)%id_vmove = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
           init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
 
     vardesc_temp = vardesc("AE_Smz","Assimilation efficiency of small zooplankton",'h','L','s','dimensionless','f')
-    zoo(1)%id_assim_eff = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(SMZ)%id_assim_eff = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
           init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
  
     vardesc_temp = vardesc("AE_Mdz","Assimilation efficiency of medium zooplankton",'h','L','s','dimensionless','f')
-    zoo(2)%id_assim_eff = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(MDZ)%id_assim_eff = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
           init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
  
     vardesc_temp = vardesc("AE_Lgz","Assimilation efficiency of large zooplankton",'h','L','s','dimensionless','f')
-    zoo(3)%id_assim_eff = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(LGZ)%id_assim_eff = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
           init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
  
     vardesc_temp = vardesc("AE_vmMdz","Assimilation efficiency of migrating medium zooplankton",'h','L','s','dimensionless','f')
-    zoo(4)%id_assim_eff = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(VMMDZ)%id_assim_eff = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
           init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
  
     vardesc_temp = vardesc("AE_vmLgz","Assimilation efficiency of migrating large zooplankton",'h','L','s','dimensionless','f')
-    zoo(5)%id_assim_eff = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(VMLGZ)%id_assim_eff = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("AE_Smt","Assimilation efficiency of small tunicates",'h','L','s','dimensionless','f')
+    zoo(SMT)%id_assim_eff = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("AE_Lgt","Assimilation efficiency of large tunicates",'h','L','s','dimensionless','f')
+    zoo(LGT)%id_assim_eff = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
 
     vardesc_temp = vardesc("jmetabo_nSmz","Production of nh4 by small zooplankton metabolism, layer integral",&
                            'h','L','s','mol N m-2 s-1','f')
-    zoo(1)%id_jmetabo_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(SMZ)%id_jmetabo_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jmetabo_nMdz","Production of nh4 by medium zooplankton metabolism, layer integral",&
                            'h','L','s','mol N m-2 s-1','f')
-    zoo(2)%id_jmetabo_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(MDZ)%id_jmetabo_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
     
     vardesc_temp = vardesc("jmetabo_nLgz","Production of nh4 by large zooplankton metabolism, layer integral",&
                            'h','L','s','mol N m-2 s-1','f')
-    zoo(3)%id_jmetabo_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(LGZ)%id_jmetabo_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jmetabo_nvmMdz","Production of nh4 by vertically migrating medium zooplankton metabolism, layer integral",&
                            'h','L','s','mol N m-2 s-1','f')
-    zoo(4)%id_jmetabo_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(VMMDZ)%id_jmetabo_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jmetabo_nvmLgz","Production of nh4 by vertically migrating large zooplankton metabolism, layer integral",&
                            'h','L','s','mol N m-2 s-1','f')
-    zoo(5)%id_jmetabo_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+    zoo(VMLGZ)%id_jmetabo_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("jmetabo_nSmt","Production of nh4 by vertically small tunicates metabolism, layer integral",&
+                           'h','L','s','mol N m-2 s-1','f')
+    zoo(SMT)%id_jmetabo_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("jmetabo_nLgt","Production of nh4 by vertically large tunicates metabolism, layer integral",&
+                           'h','L','s','mol N m-2 s-1','f')
+    zoo(LGT)%id_jmetabo_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
 
@@ -3151,128 +3434,168 @@ module COBALT_reg_diag
 
 
     vardesc_temp = vardesc("jprod_nsmz_100","Small zooplankton nitrogen prod. integral in upper 100m",'h','1','s','mol m-2 s-1','f')
-    zoo(1)%id_jprod_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+    zoo(SMZ)%id_jprod_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_nmdz_100","Medium zooplankton nitrogen prod. integral in upper 100m",'h','1','s','mol m-2 s-1','f')
-    zoo(2)%id_jprod_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+    zoo(MDZ)%id_jprod_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_nlgz_100","Large zooplankton nitrogen prod. integral in upper 100m",'h','1','s','mol m-2 s-1','f')
-    zoo(3)%id_jprod_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+    zoo(LGZ)%id_jprod_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_nvmmdz_100","Medium migrating zooplankton nitrogen prod. integral in upper 100m",'h','1','s','mol m-2 s-1','f')
-    zoo(4)%id_jprod_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+    zoo(VMMDZ)%id_jprod_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_nvmlgz_100","Large migrating zooplankton nitrogen prod. integral in upper 100m",'h','1','s','mol m-2 s-1','f')
-    zoo(5)%id_jprod_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+    zoo(VMLGZ)%id_jprod_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("jprod_nsmt_100","Small tunicate nitrogen prod. integral in upper 100m",'h','1','s','mol m-2 s-1','f')
+    zoo(SMT)%id_jprod_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("jprod_nlgt_100","Large tunicate nitrogen prod. integral in upper 100m",'h','1','s','mol m-2 s-1','f')
+    zoo(LGT)%id_jprod_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
 
 
     vardesc_temp = vardesc("jingest_n_nsmz_100","Small zooplankton nitrogen ingestion integral in upper 100m",'h','1','s','mol m-2 s-1','f')
-    zoo(1)%id_jingest_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+    zoo(SMZ)%id_jingest_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jingest_n_nmdz_100","Medium zooplankton nitrogen ingestion integral in upper 100m",'h','1','s','mol m-2 s-1','f')
-    zoo(2)%id_jingest_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+    zoo(MDZ)%id_jingest_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jingest_n_nlgz_100","Large zooplankton nitrogen ingestion integral in upper 100m",'h','1','s','mol m-2 s-1','f')
-    zoo(3)%id_jingest_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+    zoo(LGZ)%id_jingest_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
    vardesc_temp = vardesc("jingest_n_nvmmdz_100","Medium migrating zooplankton nitrogen ingestion integral in upper 100m",'h','1','s','mol m-2 s-1','f')
-    zoo(4)%id_jingest_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+    zoo(VMMDZ)%id_jingest_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jingest_n_nvmlgz_100","Large migrating zooplankton nitrogen ingestion integral in upper 100m",'h','1','s','mol m-2 s-1','f')
-    zoo(5)%id_jingest_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+    zoo(VMLGZ)%id_jingest_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("jingest_n_nsmt_100","Small tunicate nitrogen ingestion integral in upper 100m",'h','1','s','mol m-2 s-1','f')
+    zoo(SMT)%id_jingest_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("jingest_n_nlgt_100","Large tunicate nitrogen ingestion integral in upper 100m",'h','1','s','mol m-2 s-1','f')
+    zoo(LGT)%id_jingest_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
 
 
     vardesc_temp = vardesc("jzloss_nsmz_100","Small zooplankton nitrogen loss to zooplankton integral in upper 100m",'h','1','s','mol m-2 s-1','f')
-    zoo(1)%id_jzloss_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+    zoo(SMZ)%id_jzloss_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jzloss_nmdz_100","Medium zooplankton nitrogen loss to zooplankton integral in upper 100m",'h','1','s','mol m-2 s-1','f')
-    zoo(2)%id_jzloss_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+    zoo(MDZ)%id_jzloss_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jzloss_nvmmdz_100","Medium migrating zooplankton nitrogen loss to zooplankton integral in upper 100m",'h','1','s','mol m-2 s-1','f')
-    zoo(4)%id_jzloss_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+    zoo(VMMDZ)%id_jzloss_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jhploss_nmdz_100","Medium zooplankton nitrogen loss to higher preds. integral in upper 100m",'h','1','s','mol m-2 s-1','f')
-    zoo(2)%id_jhploss_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+    zoo(MDZ)%id_jhploss_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jhploss_nlgz_100","Large zooplankton nitrogen loss to higher preds. integral in upper 100m",'h','1','s','mol m-2 s-1','f')
-    zoo(3)%id_jhploss_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+    zoo(LGZ)%id_jhploss_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jhploss_nvmmdz_100","Medium migrating zooplankton nitrogen loss to higher preds. integral in upper 100m",'h','1','s','mol m-2 s-1','f')
-    zoo(4)%id_jhploss_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+    zoo(VMMDZ)%id_jhploss_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jhploss_nvmlgz_100","Large migrating zooplankton nitrogen loss to higher preds. integral in upper 100m",'h','1','s','mol m-2 s-1','f')
-    zoo(5)%id_jhploss_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+    zoo(VMLGZ)%id_jhploss_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("jhploss_nsmt_100","Small tunicate nitrogen loss to higher preds. integral in upper 100m",'h','1','s','mol m-2 s-1','f')
+    zoo(SMT)%id_jhploss_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("jhploss_nlgt_100","Large tunicate nitrogen loss to higher preds. integral in upper 100m",'h','1','s','mol m-2 s-1','f')
+    zoo(LGT)%id_jhploss_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
 
 
     vardesc_temp = vardesc("jprod_ndet_nmdz_100","Medium zooplankton nitrogen detritus prod. integral in upper 100m",'h','1','s','mol m-2 s-1','f')
-    zoo(2)%id_jprod_ndet_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+    zoo(MDZ)%id_jprod_ndet_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_ndet_nlgz_100","Large zooplankton nitrogen detritus prod. integral in upper 100m",'h','1','s','mol m-2 s-1','f')
-    zoo(3)%id_jprod_ndet_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+    zoo(LGZ)%id_jprod_ndet_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
    vardesc_temp = vardesc("jprod_ndet_nvmmdz_100","Medium migrating zooplankton nitrogen detritus prod. integral in upper 100m",'h','1','s','mol m-2 s-1','f')
-    zoo(4)%id_jprod_ndet_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+    zoo(VMMDZ)%id_jprod_ndet_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_ndet_nvmlgz_100","Large migrating zooplankton nitrogen detritus prod. integral in upper 100m",'h','1','s','mol m-2 s-1','f')
-    zoo(5)%id_jprod_ndet_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+    zoo(VMLGZ)%id_jprod_ndet_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("jprod_ndet_nsmt_100","Small tunicate nitrogen detritus prod. integral in upper 100m",'h','1','s','mol m-2 s-1','f')
+    zoo(SMT)%id_jprod_ndet_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("jprod_ndet_nlgt_100","Large tunicate nitrogen detritus prod. integral in upper 100m",'h','1','s','mol m-2 s-1','f')
+    zoo(LGT)%id_jprod_ndet_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
 
 
     vardesc_temp = vardesc("jprod_don_nsmz_100","Small zooplankton dissolved org. nitrogen prod. integral in upper 100m",'h','1','s','mol m-2 s-1','f')
-    zoo(1)%id_jprod_don_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+    zoo(SMZ)%id_jprod_don_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_don_nmdz_100","Medium zooplankton dissolved org. nitrogen prod. integral in upper 100m",'h','1','s','mol m-2 s-1','f')
-    zoo(2)%id_jprod_don_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+    zoo(MDZ)%id_jprod_don_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jprod_don_nvmmdz_100","Medium migrating zooplankton dissolved org. nitrogen prod. integral in upper 100m",'h','1','s','mol m-2 s-1','f')
-    zoo(4)%id_jprod_don_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+    zoo(VMMDZ)%id_jprod_don_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
          
     vardesc_temp = vardesc("jremin_n_nsmz_100","Small zooplankton nitrogen remineralization integral in upper 100m",'h','1','s','mol m-2 s-1','f')
-    zoo(1)%id_jremin_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+    zoo(SMZ)%id_jremin_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jremin_n_nmdz_100","Medium zooplankton nitrogen remineralization integral in upper 100m",'h','1','s','mol m-2 s-1','f')
-    zoo(2)%id_jremin_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+    zoo(MDZ)%id_jremin_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jremin_n_nlgz_100","Large zooplankton nitrogen remineralization integral in upper 100m",'h','1','s','mol m-2 s-1','f')
-    zoo(3)%id_jremin_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+    zoo(LGZ)%id_jremin_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jremin_n_nvmmdz_100","Medium migrating zooplankton nitrogen remineralization integral in upper 100m",'h','1','s','mol m-2 s-1','f')
-    zoo(4)%id_jremin_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+    zoo(VMMDZ)%id_jremin_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("jremin_n_nvmlgz_100","Large migrating zooplankton nitrogen remineralization integral in upper 100m",'h','1','s','mol m-2 s-1','f')
-    zoo(5)%id_jremin_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+    zoo(VMLGZ)%id_jremin_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("jremin_n_nsmt_100","Small tunicate nitrogen remineralization integral in upper 100m",'h','1','s','mol m-2 s-1','f')
+    zoo(SMT)%id_jremin_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("jremin_n_nlgt_100","Large tunicate nitrogen remineralization integral in upper 100m",'h','1','s','mol m-2 s-1','f')
+    zoo(LGT)%id_jremin_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
 
@@ -3479,23 +3802,31 @@ module COBALT_reg_diag
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("nsmz_100","Small zooplankton nitrogen biomass in upper 100m",'h','1','s','mol m-2','f')
-    zoo(1)%id_f_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+    zoo(SMZ)%id_f_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("nmdz_100","Medium zooplankton nitrogen biomass in upper 100m",'h','1','s','mol m-2','f')
-    zoo(2)%id_f_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+    zoo(MDZ)%id_f_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("nlgz_100","Large zooplankton nitrogen biomass in upper 100m",'h','1','s','mol m-2','f')
-    zoo(3)%id_f_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+    zoo(LGZ)%id_f_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("nvmmdz_100","Medium migrating zooplankton nitrogen biomass in upper 100m",'h','1','s','mol m-2','f')
-    zoo(4)%id_f_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+    zoo(VMMDZ)%id_f_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("nvmlgz_100","Large migrating zooplankton nitrogen biomass in upper 100m",'h','1','s','mol m-2','f')
-    zoo(5)%id_f_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+    zoo(VMLGZ)%id_f_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("nsmt_100","Small tunicate nitrogen biomass in upper 100m",'h','1','s','mol m-2','f')
+    zoo(SMT)%id_f_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("nlgt_100","Large tunicate nitrogen biomass in upper 100m",'h','1','s','mol m-2','f')
+    zoo(LGT)%id_f_n_100 = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("nbact_100","Bacterial nitrogen biomass in upper 100m",'h','1','s','mol m-2','f')
@@ -5382,6 +5713,77 @@ module COBALT_reg_diag
      vardesc_temp = vardesc("chl_dmsp_sfc","Chl used for DMSp calculation",'h','1','s','mg/m3','f')
      cobalt%id_chl_dmsp  = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
           init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+
+
+!==============================================================================================================
+! Diagnostics added with the GZ-COBALT merge: aggregation losses and the fast-sinking detritus produced by
+! each zooplankton group, plus the fast-sinking iron detritus pool.  These are registered in a loop over
+! groups rather than written out group by group, so that adding a further group needs no edits here.
+!==============================================================================================================
+
+    do nzoo = 1,NUM_ZOO !{
+
+       vardesc_temp = vardesc("jaggloss_n_"//trim(zoo_sfx(nzoo)), &
+                              "Loss of nitrogen from "//trim(zoo_name(nzoo))//" by aggregation", &
+                              'h','L','s','mol N kg-1 s-1','f')
+       zoo(nzoo)%id_jaggloss_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+            init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+       vardesc_temp = vardesc("jaggloss_p_"//trim(zoo_sfx(nzoo)), &
+                              "Loss of phosphorus from "//trim(zoo_name(nzoo))//" by aggregation", &
+                              'h','L','s','mol P kg-1 s-1','f')
+       zoo(nzoo)%id_jaggloss_p = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+            init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+       vardesc_temp = vardesc("jprod_ndet_fast_"//trim(zoo_sfx(nzoo)), &
+                              "Production of fast-sinking nitrogen detritus by "//trim(zoo_name(nzoo)), &
+                              'h','L','s','mol N kg-1 s-1','f')
+       zoo(nzoo)%id_jprod_ndet_fast = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+            init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+       vardesc_temp = vardesc("jprod_pdet_fast_"//trim(zoo_sfx(nzoo)), &
+                              "Production of fast-sinking phosphorous detritus by "//trim(zoo_name(nzoo)), &
+                              'h','L','s','mol P kg-1 s-1','f')
+       zoo(nzoo)%id_jprod_pdet_fast = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+            init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+       vardesc_temp = vardesc("jprod_fedet_fast_"//trim(zoo_sfx(nzoo)), &
+                              "Production of fast-sinking iron detritus by "//trim(zoo_name(nzoo)), &
+                              'h','L','s','mol Fe kg-1 s-1','f')
+       zoo(nzoo)%id_jprod_fedet_fast = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+            init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    enddo !} nzoo
+
+    vardesc_temp = vardesc("jprod_fedet_fast","Fast sinking iron detritus production, layer integral", &
+                           'h','L','s','mol Fe kg-1 s-1','f')
+    cobalt%id_jprod_fedet_fast = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("jremin_fedet_fast","Fast sinking iron detritus remineralization, layer integral", &
+                           'h','L','s','mol Fe kg-1 s-1','f')
+    cobalt%id_jremin_fedet_fast = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("jfe_ads_fast","Iron adsorption onto fast sinking detritus, layer integral", &
+                           'h','L','s','mol Fe kg-1 s-1','f')
+    cobalt%id_jfe_ads_fast = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("jfedet_fast","Fast sinking iron detritus source/sink, layer integral", &
+                           'h','L','s','mol Fe kg-1 s-1','f')
+    cobalt%id_jfedet_fast = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("ffedet_fast","Fast sinking iron detritus flux",'h','1','s','mol m-2 s-1','f')
+    cobalt%id_ffedet_fast_tp = register_diag_field(package_name, vardesc_temp%name, axesTi(1:1),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
+
+    vardesc_temp = vardesc("ffedet_fast_btm","Fast sinking iron detritus flux to sediments", &
+                           'h','1','s','mol m-2 s-1','f')
+    cobalt%id_ffedet_fast_btm = register_diag_field(package_name, vardesc_temp%name, axes(1:2),&
+         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
 
 !==============================================================================================================
