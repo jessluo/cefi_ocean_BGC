@@ -1959,58 +1959,63 @@ contains
     !
     ! Gut and metabolite kinetics for vertically migrating groups.  Ingested material enters a gut pool
     ! that is carried with the animal as it swims and is evacuated at a temperature-dependent rate
-    ! (k_clear_gut + k_temp_gut*T), following the gut evacuation relationship of Dam and Peterson (1988).
-    ! Assimilated material enters a metabolite pool that is converted to biomass and excreta at
+    ! (k_clear_gut + k_temp_gut*T), in the form of the gut evacuation relationship of Dam and Peterson
+    ! (1988).  Assimilated material enters a metabolite pool that is converted to biomass and excreta at
     ! k_clear_met.  These pools are what make active transport of N, P, Fe and Si by migrators possible.
     ! They are only used where zoo%does_dvm is .true., but are registered for every group so that
     ! migration can be switched on for any group from the parameter file.
+    !
+    ! Values are those used for the migrating crustacean zooplankton in the COBALTv2-DVM code
+    ! (M. Poupon, pers. comm. 2024), which this implementation descends from.  Note that the large
+    ! tunicates inherit the same values by default: salp gut passage differs from that of copepods,
+    ! so k_clear_gut_lgt and k_temp_gut_lgt are candidates for retuning.
     !
     ! Reference:
     ! Dam and Peterson (1988): https://doi.org/10.1016/0022-0981(88)90056-8
     !
     call get_param(param_file, "generic_COBALT", "k_clear_gut_smz", zoo(SMZ)%k_clear_gut, &
                    "temperature-independent gut evacuation rate for small zooplankton", units="day-1", &
-                   default=16.85, scale=I_sperd)
+                   default=8.0, scale=I_sperd)
     call get_param(param_file, "generic_COBALT", "k_clear_gut_mdz", zoo(MDZ)%k_clear_gut, &
                    "temperature-independent gut evacuation rate for medium zooplankton", units="day-1", &
-                   default=16.85, scale=I_sperd)
+                   default=8.0, scale=I_sperd)
     call get_param(param_file, "generic_COBALT", "k_clear_gut_lgz", zoo(LGZ)%k_clear_gut, &
                    "temperature-independent gut evacuation rate for large zooplankton", units="day-1", &
-                   default=16.85, scale=I_sperd)
+                   default=8.0, scale=I_sperd)
     call get_param(param_file, "generic_COBALT", "k_clear_gut_vmmdz", zoo(VMMDZ)%k_clear_gut, &
                    "temperature-independent gut evacuation rate for medium migrating zooplankton", units="day-1", &
-                   default=16.85, scale=I_sperd)
+                   default=8.0, scale=I_sperd)
     call get_param(param_file, "generic_COBALT", "k_clear_gut_vmlgz", zoo(VMLGZ)%k_clear_gut, &
                    "temperature-independent gut evacuation rate for large migrating zooplankton", units="day-1", &
-                   default=16.85, scale=I_sperd)
+                   default=8.0, scale=I_sperd)
     call get_param(param_file, "generic_COBALT", "k_clear_gut_smt", zoo(SMT)%k_clear_gut, &
                    "temperature-independent gut evacuation rate for small tunicates", units="day-1", &
-                   default=16.85, scale=I_sperd)
+                   default=8.0, scale=I_sperd)
     call get_param(param_file, "generic_COBALT", "k_clear_gut_lgt", zoo(LGT)%k_clear_gut, &
                    "temperature-independent gut evacuation rate for large tunicates", units="day-1", &
-                   default=16.85, scale=I_sperd)
+                   default=8.0, scale=I_sperd)
 
     call get_param(param_file, "generic_COBALT", "k_temp_gut_smz", zoo(SMZ)%k_temp_gut, &
                    "temperature dependence of gut evacuation for small zooplankton", units="day-1 deg. C-1", &
-                   default=2.37, scale=I_sperd)
+                   default=4.32, scale=I_sperd)
     call get_param(param_file, "generic_COBALT", "k_temp_gut_mdz", zoo(MDZ)%k_temp_gut, &
                    "temperature dependence of gut evacuation for medium zooplankton", units="day-1 deg. C-1", &
-                   default=2.37, scale=I_sperd)
+                   default=4.32, scale=I_sperd)
     call get_param(param_file, "generic_COBALT", "k_temp_gut_lgz", zoo(LGZ)%k_temp_gut, &
                    "temperature dependence of gut evacuation for large zooplankton", units="day-1 deg. C-1", &
-                   default=2.37, scale=I_sperd)
+                   default=4.32, scale=I_sperd)
     call get_param(param_file, "generic_COBALT", "k_temp_gut_vmmdz", zoo(VMMDZ)%k_temp_gut, &
                    "temperature dependence of gut evacuation for medium migrating zooplankton", units="day-1 deg. C-1", &
-                   default=2.37, scale=I_sperd)
+                   default=4.32, scale=I_sperd)
     call get_param(param_file, "generic_COBALT", "k_temp_gut_vmlgz", zoo(VMLGZ)%k_temp_gut, &
                    "temperature dependence of gut evacuation for large migrating zooplankton", units="day-1 deg. C-1", &
-                   default=2.37, scale=I_sperd)
+                   default=4.32, scale=I_sperd)
     call get_param(param_file, "generic_COBALT", "k_temp_gut_smt", zoo(SMT)%k_temp_gut, &
                    "temperature dependence of gut evacuation for small tunicates", units="day-1 deg. C-1", &
-                   default=2.37, scale=I_sperd)
+                   default=4.32, scale=I_sperd)
     call get_param(param_file, "generic_COBALT", "k_temp_gut_lgt", zoo(LGT)%k_temp_gut, &
                    "temperature dependence of gut evacuation for large tunicates", units="day-1 deg. C-1", &
-                   default=2.37, scale=I_sperd)
+                   default=4.32, scale=I_sperd)
 
     call get_param(param_file, "generic_COBALT", "k_clear_met_smz", zoo(SMZ)%k_clear_met, &
                    "turnover rate of the metabolite pool for small zooplankton", units="day-1", &
