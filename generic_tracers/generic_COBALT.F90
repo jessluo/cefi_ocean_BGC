@@ -367,6 +367,7 @@ contains
     !==============================================================
 
     integer :: stdoutunit
+    integer :: nzoo               !< loop index for validating the per-group DVM settings
 
     !=============
     !Block Starts: g_tracer_add_param
@@ -1962,8 +1963,13 @@ contains
     ! (k_clear_gut + k_temp_gut*T), in the form of the gut evacuation relationship of Dam and Peterson
     ! (1988).  Assimilated material enters a metabolite pool that is converted to biomass and excreta at
     ! k_clear_met.  These pools are what make active transport of N, P, Fe and Si by migrators possible.
-    ! They are only used where zoo%does_dvm is .true., but are registered for every group so that
-    ! migration can be switched on for any group from the parameter file.
+    !
+    ! These parameters are only used where zoo%does_dvm is .true.  They are registered for every group
+    ! for uniformity, but that does NOT mean migration can be enabled for any group: the gut and
+    ! metabolite tracers themselves exist only for VMMDZ, VMLGZ and LGT, so those are the only groups
+    ! for which does_dvm may be set .true.  Enabling it elsewhere is rejected below.  Switching it
+    ! .false. for any of the three is supported and leaves that group's gut and metabolite tracers
+    ! untouched at their initial values.
     !
     ! Values are those used for the migrating crustacean zooplankton in the COBALTv2-DVM code
     ! (M. Poupon, pers. comm. 2024), which this implementation descends from.  Note that the large
@@ -2057,6 +2063,19 @@ contains
                    "small tunicates perform diel vertical migration", default=.false.)
     call get_param(param_file, "generic_COBALT", "does_dvm_lgt", zoo(LGT)%does_dvm, &
                    "large tunicates perform diel vertical migration", default=.true.)
+
+    ! Only the groups that own gut and metabolite tracers can migrate.  Enabling does_dvm elsewhere
+    ! would allocate that group's gut arrays with no tracer behind them: ingested material would be
+    ! loaded into a gut that is never carried or cleared, and the run would die later with an opaque
+    ! "biological source/sink imbalance: Nitrogen".  Fail here instead, where the cause is obvious.
+    do nzoo = 1,NUM_ZOO !{
+       if (zoo(nzoo)%does_dvm .and. .not. (nzoo == VMMDZ .or. nzoo == VMLGZ .or. nzoo == LGT)) then
+          call mpp_error(FATAL, 'generic_COBALT: does_dvm may only be enabled for vmmdz, vmlgz or '// &
+               'lgt.  The other zooplankton groups have no gut or metabolite tracers to carry '// &
+               'ingested material, so migration cannot be switched on for them from the '// &
+               'parameter file.')
+       endif
+    enddo !} nzoo
     !
     ! Zooplankton aggregation.  Salps in particular form dense blooms that collapse into rapidly sinking
     ! carcass aggregations ("salp falls"), which are routed entirely to fast-sinking detritus.  This is
@@ -4337,22 +4356,31 @@ contains
     call g_tracer_get_values(tracer_list,'nvmlgz'  ,'field',zoo(VMLGZ)%f_n(:,:,:) ,isd,jsd,positive=.true.)
     call g_tracer_get_values(tracer_list,'nsmt'    ,'field',zoo(SMT)%f_n(:,:,:) ,isd,jsd,positive=.true.)
     call g_tracer_get_values(tracer_list,'nlgt'    ,'field',zoo(LGT)%f_n(:,:,:) ,isd,jsd,positive=.true.)
-    ! gut and metabolite pools of the vertically migrating groups
-    call g_tracer_get_values(tracer_list,'nvmmdz_met'  ,'field',zoo(VMMDZ)%f_met_n(:,:,:) ,isd,jsd,positive=.true.)
-    call g_tracer_get_values(tracer_list,'nvmlgz_met'  ,'field',zoo(VMLGZ)%f_met_n(:,:,:) ,isd,jsd,positive=.true.)
-    call g_tracer_get_values(tracer_list,'nlgt_met'    ,'field',zoo(LGT)%f_met_n(:,:,:) ,isd,jsd,positive=.true.)
-    call g_tracer_get_values(tracer_list,'nvmmdz_gut'  ,'field',zoo(VMMDZ)%f_gut_n(:,:,:) ,isd,jsd,positive=.true.)
-    call g_tracer_get_values(tracer_list,'nvmlgz_gut'  ,'field',zoo(VMLGZ)%f_gut_n(:,:,:) ,isd,jsd,positive=.true.)
-    call g_tracer_get_values(tracer_list,'nlgt_gut'    ,'field',zoo(LGT)%f_gut_n(:,:,:) ,isd,jsd,positive=.true.)
-    call g_tracer_get_values(tracer_list,'pvmmdz_gut'  ,'field',zoo(VMMDZ)%f_gut_p(:,:,:) ,isd,jsd,positive=.true.)
-    call g_tracer_get_values(tracer_list,'pvmlgz_gut'  ,'field',zoo(VMLGZ)%f_gut_p(:,:,:) ,isd,jsd,positive=.true.)
-    call g_tracer_get_values(tracer_list,'plgt_gut'    ,'field',zoo(LGT)%f_gut_p(:,:,:) ,isd,jsd,positive=.true.)
-    call g_tracer_get_values(tracer_list,'fevmmdz_gut'  ,'field',zoo(VMMDZ)%f_gut_fe(:,:,:) ,isd,jsd,positive=.true.)
-    call g_tracer_get_values(tracer_list,'fevmlgz_gut'  ,'field',zoo(VMLGZ)%f_gut_fe(:,:,:) ,isd,jsd,positive=.true.)
-    call g_tracer_get_values(tracer_list,'felgt_gut'    ,'field',zoo(LGT)%f_gut_fe(:,:,:) ,isd,jsd,positive=.true.)
-    call g_tracer_get_values(tracer_list,'sivmmdz_gut'  ,'field',zoo(VMMDZ)%f_gut_si(:,:,:) ,isd,jsd,positive=.true.)
-    call g_tracer_get_values(tracer_list,'sivmlgz_gut'  ,'field',zoo(VMLGZ)%f_gut_si(:,:,:) ,isd,jsd,positive=.true.)
-    call g_tracer_get_values(tracer_list,'silgt_gut'    ,'field',zoo(LGT)%f_gut_si(:,:,:) ,isd,jsd,positive=.true.)
+    ! Gut and metabolite pools of the vertically migrating groups.  These arrays are only allocated
+    ! where zoo%does_dvm is .true., so every access to them must be guarded the same way.  The
+    ! tracers themselves are always registered, so a group whose migration is switched off simply
+    ! leaves its gut and metabolite tracers untouched at their initial values.
+    if (zoo(VMMDZ)%does_dvm) then !{
+       call g_tracer_get_values(tracer_list,'nvmmdz_met'  ,'field',zoo(VMMDZ)%f_met_n(:,:,:) ,isd,jsd,positive=.true.)
+       call g_tracer_get_values(tracer_list,'nvmmdz_gut'  ,'field',zoo(VMMDZ)%f_gut_n(:,:,:) ,isd,jsd,positive=.true.)
+       call g_tracer_get_values(tracer_list,'pvmmdz_gut'  ,'field',zoo(VMMDZ)%f_gut_p(:,:,:) ,isd,jsd,positive=.true.)
+       call g_tracer_get_values(tracer_list,'fevmmdz_gut' ,'field',zoo(VMMDZ)%f_gut_fe(:,:,:) ,isd,jsd,positive=.true.)
+       call g_tracer_get_values(tracer_list,'sivmmdz_gut' ,'field',zoo(VMMDZ)%f_gut_si(:,:,:) ,isd,jsd,positive=.true.)
+    endif !}
+    if (zoo(VMLGZ)%does_dvm) then !{
+       call g_tracer_get_values(tracer_list,'nvmlgz_met'  ,'field',zoo(VMLGZ)%f_met_n(:,:,:) ,isd,jsd,positive=.true.)
+       call g_tracer_get_values(tracer_list,'nvmlgz_gut'  ,'field',zoo(VMLGZ)%f_gut_n(:,:,:) ,isd,jsd,positive=.true.)
+       call g_tracer_get_values(tracer_list,'pvmlgz_gut'  ,'field',zoo(VMLGZ)%f_gut_p(:,:,:) ,isd,jsd,positive=.true.)
+       call g_tracer_get_values(tracer_list,'fevmlgz_gut' ,'field',zoo(VMLGZ)%f_gut_fe(:,:,:) ,isd,jsd,positive=.true.)
+       call g_tracer_get_values(tracer_list,'sivmlgz_gut' ,'field',zoo(VMLGZ)%f_gut_si(:,:,:) ,isd,jsd,positive=.true.)
+    endif !}
+    if (zoo(LGT)%does_dvm) then !{
+       call g_tracer_get_values(tracer_list,'nlgt_met'    ,'field',zoo(LGT)%f_met_n(:,:,:) ,isd,jsd,positive=.true.)
+       call g_tracer_get_values(tracer_list,'nlgt_gut'    ,'field',zoo(LGT)%f_gut_n(:,:,:) ,isd,jsd,positive=.true.)
+       call g_tracer_get_values(tracer_list,'plgt_gut'    ,'field',zoo(LGT)%f_gut_p(:,:,:) ,isd,jsd,positive=.true.)
+       call g_tracer_get_values(tracer_list,'felgt_gut'   ,'field',zoo(LGT)%f_gut_fe(:,:,:) ,isd,jsd,positive=.true.)
+       call g_tracer_get_values(tracer_list,'silgt_gut'   ,'field',zoo(LGT)%f_gut_si(:,:,:) ,isd,jsd,positive=.true.)
+    endif !}
     !
     ! bacteria
     !
@@ -6150,29 +6178,39 @@ contains
        enddo !} n
     enddo; enddo; enddo; !} i, j, k
 
+    ! The biomass vmove array is allocated for every group, so it is always safe to set.  The gut and
+    ! metabolite vmove arrays exist only where zoo%does_dvm is .true., and g_tracer_set_values writes
+    ! straight into g_tracer%vmove with no allocation check, so those setters must be guarded.
+    !
     ! Medium migrating zooplankton
     call g_tracer_set_values(tracer_list,'nvmmdz',      'vmove',zoo(VMMDZ)%vmove,        isd,jsd)
-    call g_tracer_set_values(tracer_list,'nvmmdz_met',  'vmove',zoo(VMMDZ)%vmove_met,    isd,jsd)
-    call g_tracer_set_values(tracer_list,'nvmmdz_gut',  'vmove',zoo(VMMDZ)%vmove_gut,    isd,jsd)
-    call g_tracer_set_values(tracer_list,'pvmmdz_gut',  'vmove',zoo(VMMDZ)%vmove_gut_p,  isd,jsd)
-    call g_tracer_set_values(tracer_list,'fevmmdz_gut', 'vmove',zoo(VMMDZ)%vmove_gut_fe, isd,jsd)
-    call g_tracer_set_values(tracer_list,'sivmmdz_gut', 'vmove',zoo(VMMDZ)%vmove_gut_si, isd,jsd)
+    if (zoo(VMMDZ)%does_dvm) then !{
+       call g_tracer_set_values(tracer_list,'nvmmdz_met',  'vmove',zoo(VMMDZ)%vmove_met,    isd,jsd)
+       call g_tracer_set_values(tracer_list,'nvmmdz_gut',  'vmove',zoo(VMMDZ)%vmove_gut,    isd,jsd)
+       call g_tracer_set_values(tracer_list,'pvmmdz_gut',  'vmove',zoo(VMMDZ)%vmove_gut_p,  isd,jsd)
+       call g_tracer_set_values(tracer_list,'fevmmdz_gut', 'vmove',zoo(VMMDZ)%vmove_gut_fe, isd,jsd)
+       call g_tracer_set_values(tracer_list,'sivmmdz_gut', 'vmove',zoo(VMMDZ)%vmove_gut_si, isd,jsd)
+    endif !}
 
     ! Large migrating zooplankton
     call g_tracer_set_values(tracer_list,'nvmlgz',      'vmove',zoo(VMLGZ)%vmove,        isd,jsd)
-    call g_tracer_set_values(tracer_list,'nvmlgz_met',  'vmove',zoo(VMLGZ)%vmove_met,    isd,jsd)
-    call g_tracer_set_values(tracer_list,'nvmlgz_gut',  'vmove',zoo(VMLGZ)%vmove_gut,    isd,jsd)
-    call g_tracer_set_values(tracer_list,'pvmlgz_gut',  'vmove',zoo(VMLGZ)%vmove_gut_p,  isd,jsd)
-    call g_tracer_set_values(tracer_list,'fevmlgz_gut', 'vmove',zoo(VMLGZ)%vmove_gut_fe, isd,jsd)
-    call g_tracer_set_values(tracer_list,'sivmlgz_gut', 'vmove',zoo(VMLGZ)%vmove_gut_si, isd,jsd)
+    if (zoo(VMLGZ)%does_dvm) then !{
+       call g_tracer_set_values(tracer_list,'nvmlgz_met',  'vmove',zoo(VMLGZ)%vmove_met,    isd,jsd)
+       call g_tracer_set_values(tracer_list,'nvmlgz_gut',  'vmove',zoo(VMLGZ)%vmove_gut,    isd,jsd)
+       call g_tracer_set_values(tracer_list,'pvmlgz_gut',  'vmove',zoo(VMLGZ)%vmove_gut_p,  isd,jsd)
+       call g_tracer_set_values(tracer_list,'fevmlgz_gut', 'vmove',zoo(VMLGZ)%vmove_gut_fe, isd,jsd)
+       call g_tracer_set_values(tracer_list,'sivmlgz_gut', 'vmove',zoo(VMLGZ)%vmove_gut_si, isd,jsd)
+    endif !}
 
     ! Large tunicates
     call g_tracer_set_values(tracer_list,'nlgt',        'vmove',zoo(LGT)%vmove,          isd,jsd)
-    call g_tracer_set_values(tracer_list,'nlgt_met',    'vmove',zoo(LGT)%vmove_met,      isd,jsd)
-    call g_tracer_set_values(tracer_list,'nlgt_gut',    'vmove',zoo(LGT)%vmove_gut,      isd,jsd)
-    call g_tracer_set_values(tracer_list,'plgt_gut',    'vmove',zoo(LGT)%vmove_gut_p,    isd,jsd)
-    call g_tracer_set_values(tracer_list,'felgt_gut',   'vmove',zoo(LGT)%vmove_gut_fe,   isd,jsd)
-    call g_tracer_set_values(tracer_list,'silgt_gut',   'vmove',zoo(LGT)%vmove_gut_si,   isd,jsd)
+    if (zoo(LGT)%does_dvm) then !{
+       call g_tracer_set_values(tracer_list,'nlgt_met',    'vmove',zoo(LGT)%vmove_met,      isd,jsd)
+       call g_tracer_set_values(tracer_list,'nlgt_gut',    'vmove',zoo(LGT)%vmove_gut,      isd,jsd)
+       call g_tracer_set_values(tracer_list,'plgt_gut',    'vmove',zoo(LGT)%vmove_gut_p,    isd,jsd)
+       call g_tracer_set_values(tracer_list,'felgt_gut',   'vmove',zoo(LGT)%vmove_gut_fe,   isd,jsd)
+       call g_tracer_set_values(tracer_list,'silgt_gut',   'vmove',zoo(LGT)%vmove_gut_si,   isd,jsd)
+    endif !}
 
     call mpp_clock_end(id_clock_other_losses)
 
@@ -7498,20 +7536,23 @@ contains
                              zoo(VMMDZ)%jhploss_n(i,j,k) - zoo(VMMDZ)%jaggloss_n(i,j,k)
        cobalt%p_nvmmdz(i,j,k,tau) = cobalt%p_nvmmdz(i,j,k,tau) + cobalt%jnvmmdz(i,j,k)*dt*grid_tmask(i,j,k)
 
-       cobalt%jnvmmdz_gut(i,j,k) = zoo(VMMDZ)%jprod_gut_n(i,j,k) - zoo(VMMDZ)%jclear_gut_n(i,j,k)
-       cobalt%p_nvmmdz_gut(i,j,k,tau) = cobalt%p_nvmmdz_gut(i,j,k,tau) + cobalt%jnvmmdz_gut(i,j,k)*dt*grid_tmask(i,j,k)
+       ! Gut and metabolite tendencies exist only while this group migrates.
+       if (zoo(VMMDZ)%does_dvm) then !{
+          cobalt%jnvmmdz_gut(i,j,k) = zoo(VMMDZ)%jprod_gut_n(i,j,k) - zoo(VMMDZ)%jclear_gut_n(i,j,k)
+          cobalt%p_nvmmdz_gut(i,j,k,tau) = cobalt%p_nvmmdz_gut(i,j,k,tau) + cobalt%jnvmmdz_gut(i,j,k)*dt*grid_tmask(i,j,k)
 
-       cobalt%jpvmmdz_gut(i,j,k) = zoo(VMMDZ)%jprod_gut_p(i,j,k) - zoo(VMMDZ)%jclear_gut_p(i,j,k)
-       cobalt%p_pvmmdz_gut(i,j,k,tau) = cobalt%p_pvmmdz_gut(i,j,k,tau) + cobalt%jpvmmdz_gut(i,j,k)*dt*grid_tmask(i,j,k)
+          cobalt%jpvmmdz_gut(i,j,k) = zoo(VMMDZ)%jprod_gut_p(i,j,k) - zoo(VMMDZ)%jclear_gut_p(i,j,k)
+          cobalt%p_pvmmdz_gut(i,j,k,tau) = cobalt%p_pvmmdz_gut(i,j,k,tau) + cobalt%jpvmmdz_gut(i,j,k)*dt*grid_tmask(i,j,k)
 
-       cobalt%jfevmmdz_gut(i,j,k) = zoo(VMMDZ)%jprod_gut_fe(i,j,k) - zoo(VMMDZ)%jclear_gut_fe(i,j,k)
-       cobalt%p_fevmmdz_gut(i,j,k,tau) = cobalt%p_fevmmdz_gut(i,j,k,tau) + cobalt%jfevmmdz_gut(i,j,k)*dt*grid_tmask(i,j,k)
+          cobalt%jfevmmdz_gut(i,j,k) = zoo(VMMDZ)%jprod_gut_fe(i,j,k) - zoo(VMMDZ)%jclear_gut_fe(i,j,k)
+          cobalt%p_fevmmdz_gut(i,j,k,tau) = cobalt%p_fevmmdz_gut(i,j,k,tau) + cobalt%jfevmmdz_gut(i,j,k)*dt*grid_tmask(i,j,k)
 
-       cobalt%jsivmmdz_gut(i,j,k) = zoo(VMMDZ)%jprod_gut_si(i,j,k) - zoo(VMMDZ)%jclear_gut_si(i,j,k)
-       cobalt%p_sivmmdz_gut(i,j,k,tau) = cobalt%p_sivmmdz_gut(i,j,k,tau) + cobalt%jsivmmdz_gut(i,j,k)*dt*grid_tmask(i,j,k)
+          cobalt%jsivmmdz_gut(i,j,k) = zoo(VMMDZ)%jprod_gut_si(i,j,k) - zoo(VMMDZ)%jclear_gut_si(i,j,k)
+          cobalt%p_sivmmdz_gut(i,j,k,tau) = cobalt%p_sivmmdz_gut(i,j,k,tau) + cobalt%jsivmmdz_gut(i,j,k)*dt*grid_tmask(i,j,k)
 
-       cobalt%jnvmmdz_met(i,j,k) = zoo(VMMDZ)%jprod_met_n(i,j,k) - zoo(VMMDZ)%jclear_met_n(i,j,k)
-       cobalt%p_nvmmdz_met(i,j,k,tau) = cobalt%p_nvmmdz_met(i,j,k,tau) + cobalt%jnvmmdz_met(i,j,k)*dt*grid_tmask(i,j,k)
+          cobalt%jnvmmdz_met(i,j,k) = zoo(VMMDZ)%jprod_met_n(i,j,k) - zoo(VMMDZ)%jclear_met_n(i,j,k)
+          cobalt%p_nvmmdz_met(i,j,k,tau) = cobalt%p_nvmmdz_met(i,j,k,tau) + cobalt%jnvmmdz_met(i,j,k)*dt*grid_tmask(i,j,k)
+       endif !}
 
        !
        ! Vertically migrating large zooplankton
@@ -7520,20 +7561,23 @@ contains
                              zoo(VMLGZ)%jhploss_n(i,j,k) - zoo(VMLGZ)%jaggloss_n(i,j,k)
        cobalt%p_nvmlgz(i,j,k,tau) = cobalt%p_nvmlgz(i,j,k,tau) + cobalt%jnvmlgz(i,j,k)*dt*grid_tmask(i,j,k)
 
-       cobalt%jnvmlgz_gut(i,j,k) =  zoo(VMLGZ)%jprod_gut_n(i,j,k) - zoo(VMLGZ)%jclear_gut_n(i,j,k)
-       cobalt%p_nvmlgz_gut(i,j,k,tau) = cobalt%p_nvmlgz_gut(i,j,k,tau) + cobalt%jnvmlgz_gut(i,j,k)*dt*grid_tmask(i,j,k)
+       ! Gut and metabolite tendencies exist only while this group migrates.
+       if (zoo(VMLGZ)%does_dvm) then !{
+          cobalt%jnvmlgz_gut(i,j,k) =  zoo(VMLGZ)%jprod_gut_n(i,j,k) - zoo(VMLGZ)%jclear_gut_n(i,j,k)
+          cobalt%p_nvmlgz_gut(i,j,k,tau) = cobalt%p_nvmlgz_gut(i,j,k,tau) + cobalt%jnvmlgz_gut(i,j,k)*dt*grid_tmask(i,j,k)
 
-       cobalt%jpvmlgz_gut(i,j,k) =  zoo(VMLGZ)%jprod_gut_p(i,j,k) - zoo(VMLGZ)%jclear_gut_p(i,j,k)
-       cobalt%p_pvmlgz_gut(i,j,k,tau) = cobalt%p_pvmlgz_gut(i,j,k,tau) + cobalt%jpvmlgz_gut(i,j,k)*dt*grid_tmask(i,j,k)
+          cobalt%jpvmlgz_gut(i,j,k) =  zoo(VMLGZ)%jprod_gut_p(i,j,k) - zoo(VMLGZ)%jclear_gut_p(i,j,k)
+          cobalt%p_pvmlgz_gut(i,j,k,tau) = cobalt%p_pvmlgz_gut(i,j,k,tau) + cobalt%jpvmlgz_gut(i,j,k)*dt*grid_tmask(i,j,k)
 
-       cobalt%jfevmlgz_gut(i,j,k) =  zoo(VMLGZ)%jprod_gut_fe(i,j,k) - zoo(VMLGZ)%jclear_gut_fe(i,j,k)
-       cobalt%p_fevmlgz_gut(i,j,k,tau) = cobalt%p_fevmlgz_gut(i,j,k,tau) + cobalt%jfevmlgz_gut(i,j,k)*dt*grid_tmask(i,j,k)
+          cobalt%jfevmlgz_gut(i,j,k) =  zoo(VMLGZ)%jprod_gut_fe(i,j,k) - zoo(VMLGZ)%jclear_gut_fe(i,j,k)
+          cobalt%p_fevmlgz_gut(i,j,k,tau) = cobalt%p_fevmlgz_gut(i,j,k,tau) + cobalt%jfevmlgz_gut(i,j,k)*dt*grid_tmask(i,j,k)
 
-       cobalt%jsivmlgz_gut(i,j,k) =  zoo(VMLGZ)%jprod_gut_si(i,j,k) - zoo(VMLGZ)%jclear_gut_si(i,j,k)
-       cobalt%p_sivmlgz_gut(i,j,k,tau) = cobalt%p_sivmlgz_gut(i,j,k,tau) + cobalt%jsivmlgz_gut(i,j,k)*dt*grid_tmask(i,j,k)
+          cobalt%jsivmlgz_gut(i,j,k) =  zoo(VMLGZ)%jprod_gut_si(i,j,k) - zoo(VMLGZ)%jclear_gut_si(i,j,k)
+          cobalt%p_sivmlgz_gut(i,j,k,tau) = cobalt%p_sivmlgz_gut(i,j,k,tau) + cobalt%jsivmlgz_gut(i,j,k)*dt*grid_tmask(i,j,k)
 
-       cobalt%jnvmlgz_met(i,j,k) =  zoo(VMLGZ)%jprod_met_n(i,j,k) - zoo(VMLGZ)%jclear_met_n(i,j,k)
-       cobalt%p_nvmlgz_met(i,j,k,tau) = cobalt%p_nvmlgz_met(i,j,k,tau) + cobalt%jnvmlgz_met(i,j,k)*dt*grid_tmask(i,j,k)
+          cobalt%jnvmlgz_met(i,j,k) =  zoo(VMLGZ)%jprod_met_n(i,j,k) - zoo(VMLGZ)%jclear_met_n(i,j,k)
+          cobalt%p_nvmlgz_met(i,j,k,tau) = cobalt%p_nvmlgz_met(i,j,k,tau) + cobalt%jnvmlgz_met(i,j,k)*dt*grid_tmask(i,j,k)
+       endif !}
 
        !
        ! Small tunicates (non-migrating, so no gut or metabolite pools)
@@ -7550,20 +7594,23 @@ contains
                              zoo(LGT)%jhploss_n(i,j,k) - zoo(LGT)%jaggloss_n(i,j,k)
        cobalt%p_nlgt(i,j,k,tau) = cobalt%p_nlgt(i,j,k,tau) + cobalt%jnlgt(i,j,k)*dt*grid_tmask(i,j,k)
 
-       cobalt%jnlgt_gut(i,j,k) =  zoo(LGT)%jprod_gut_n(i,j,k) - zoo(LGT)%jclear_gut_n(i,j,k)
-       cobalt%p_nlgt_gut(i,j,k,tau) = cobalt%p_nlgt_gut(i,j,k,tau) + cobalt%jnlgt_gut(i,j,k)*dt*grid_tmask(i,j,k)
+       ! Gut and metabolite tendencies exist only while this group migrates.
+       if (zoo(LGT)%does_dvm) then !{
+          cobalt%jnlgt_gut(i,j,k) =  zoo(LGT)%jprod_gut_n(i,j,k) - zoo(LGT)%jclear_gut_n(i,j,k)
+          cobalt%p_nlgt_gut(i,j,k,tau) = cobalt%p_nlgt_gut(i,j,k,tau) + cobalt%jnlgt_gut(i,j,k)*dt*grid_tmask(i,j,k)
 
-       cobalt%jplgt_gut(i,j,k) =  zoo(LGT)%jprod_gut_p(i,j,k) - zoo(LGT)%jclear_gut_p(i,j,k)
-       cobalt%p_plgt_gut(i,j,k,tau) = cobalt%p_plgt_gut(i,j,k,tau) + cobalt%jplgt_gut(i,j,k)*dt*grid_tmask(i,j,k)
+          cobalt%jplgt_gut(i,j,k) =  zoo(LGT)%jprod_gut_p(i,j,k) - zoo(LGT)%jclear_gut_p(i,j,k)
+          cobalt%p_plgt_gut(i,j,k,tau) = cobalt%p_plgt_gut(i,j,k,tau) + cobalt%jplgt_gut(i,j,k)*dt*grid_tmask(i,j,k)
 
-       cobalt%jfelgt_gut(i,j,k) =  zoo(LGT)%jprod_gut_fe(i,j,k) - zoo(LGT)%jclear_gut_fe(i,j,k)
-       cobalt%p_felgt_gut(i,j,k,tau) = cobalt%p_felgt_gut(i,j,k,tau) + cobalt%jfelgt_gut(i,j,k)*dt*grid_tmask(i,j,k)
+          cobalt%jfelgt_gut(i,j,k) =  zoo(LGT)%jprod_gut_fe(i,j,k) - zoo(LGT)%jclear_gut_fe(i,j,k)
+          cobalt%p_felgt_gut(i,j,k,tau) = cobalt%p_felgt_gut(i,j,k,tau) + cobalt%jfelgt_gut(i,j,k)*dt*grid_tmask(i,j,k)
 
-       cobalt%jsilgt_gut(i,j,k) =  zoo(LGT)%jprod_gut_si(i,j,k) - zoo(LGT)%jclear_gut_si(i,j,k)
-       cobalt%p_silgt_gut(i,j,k,tau) = cobalt%p_silgt_gut(i,j,k,tau) + cobalt%jsilgt_gut(i,j,k)*dt*grid_tmask(i,j,k)
+          cobalt%jsilgt_gut(i,j,k) =  zoo(LGT)%jprod_gut_si(i,j,k) - zoo(LGT)%jclear_gut_si(i,j,k)
+          cobalt%p_silgt_gut(i,j,k,tau) = cobalt%p_silgt_gut(i,j,k,tau) + cobalt%jsilgt_gut(i,j,k)*dt*grid_tmask(i,j,k)
 
-       cobalt%jnlgt_met(i,j,k) =  zoo(LGT)%jprod_met_n(i,j,k) - zoo(LGT)%jclear_met_n(i,j,k)
-       cobalt%p_nlgt_met(i,j,k,tau) = cobalt%p_nlgt_met(i,j,k,tau) + cobalt%jnlgt_met(i,j,k)*dt*grid_tmask(i,j,k)
+          cobalt%jnlgt_met(i,j,k) =  zoo(LGT)%jprod_met_n(i,j,k) - zoo(LGT)%jclear_met_n(i,j,k)
+          cobalt%p_nlgt_met(i,j,k,tau) = cobalt%p_nlgt_met(i,j,k,tau) + cobalt%jnlgt_met(i,j,k)*dt*grid_tmask(i,j,k)
+       endif !}
     enddo; enddo ; enddo  !} i,j,k
 !
     call mpp_clock_end(id_clock_source_sink_loop4)
