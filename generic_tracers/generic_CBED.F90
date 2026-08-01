@@ -1038,9 +1038,9 @@ contains
                         else if (trim(field_name) == "f_om3") then
                            f_old(1) = f_old(1) + (frac_OM3(i,j) * cobalt%fntot_btm(i,j) * cobalt%c_2_n * dt) / capacity(1)
                         else if (trim(field_name) == "f_calc") then
-                           f_old(1) = f_old(1) + (cobalt%fcadet_calc_btm(i,j) * dt) / capacity(1)
+                           f_old(1) = f_old(1) + (cobalt%f_cadet_calc_btf(i,j,1) * dt) / capacity(1)
                         else if (trim(field_name) == "f_arag") then
-                           f_old(1) = f_old(1) + (cobalt%fcadet_arag_btm(i,j) * dt) / capacity(1)
+                           f_old(1) = f_old(1) + (cobalt%f_cadet_arag_btf(i,j,1) * dt) / capacity(1)
                         endif
                      endif
 
