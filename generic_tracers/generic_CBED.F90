@@ -13,6 +13,8 @@ module generic_CBED
    use fms2_io_mod, only: FmsNetcdfDomainFile_t, open_file, close_file, read_restart, write_restart
    use fms2_io_mod, only: register_restart_field, register_axis, register_field
    use fms_mod, only: error_mesg, NOTE, WARNING, FATAL
+   use mpp_mod,           only: stdout
+   use fms_mod,           only: stdout
    !use, intrinsic :: ieee_arithmetic ! for checking presence of NaN or inf
 
    implicit none; private
@@ -20,7 +22,7 @@ module generic_CBED
    character(len=fm_string_len), parameter :: mod_name       = 'generic_CBED'
    character(len=fm_string_len), parameter :: package_name   = 'generic_cbed'
 
-   public generic_CBED_sediments_update_from_source
+   public generic_CBED_update_from_source
    public generic_CBED_init, generic_CBED_end
    public generic_CBED_reg_diagnostics, generic_CBED_send_diagnostics
 
@@ -36,7 +38,6 @@ module generic_CBED
 
       ! State variables
 
-      !real, dimension(:,:,:), allocatable :: f_tr1  ! tracer 1 concentration field
       real, dimension(:,:,:), allocatable :: f_o2   ! tracer o2 concentration field
       real, dimension(:,:,:), allocatable :: f_om1   ! tracer organic matter 1 (fast reacting) concentration field
       real, dimension(:,:,:), allocatable :: f_om2   ! tracer organic matter 2 (medium reacting) concentration field
@@ -105,7 +106,6 @@ module generic_CBED
 
 
 
-      !integer :: id_tr1                              ! tracer 1 diagnostics id
       integer :: id_o2                               ! tracer o2 diagnostics id
       integer :: id_om1                              ! tracer om1 diagnostics id
       integer :: id_om2                              ! tracer om2 diagnostics id
@@ -283,7 +283,6 @@ contains
       !   cbed_tmask(i,j,k) = grid_tmask(i,j,nk) ; enddo; enddo; enddo
 
       !Allocate and initialize CBED arrays for tracer concentrations and other workarrays
-      !allocate(cbed%f_tr1(isd:ied,jsd:jed,nk_cbed));cbed%f_tr1=0.0
       allocate(cbed%f_o2(isd:ied,jsd:jed,nk_cbed));cbed%f_o2=0.0
       allocate(cbed%f_om1(isd:ied,jsd:jed,nk_cbed));cbed%f_om1=0.0
       allocate(cbed%f_om2(isd:ied,jsd:jed,nk_cbed));cbed%f_om2=0.0
@@ -454,7 +453,6 @@ contains
          !call register_field(fileobj, "y", "double", (/"y"/))
          call register_axis(fileobj,'lev',nk_cbed)
          ! register the restart variables
-         !call register_restart_field(fileobj, "cbed_tr1", cbed%f_tr1, (/"x","y","lev"/))
          call register_restart_field(fileobj, "cbed_o2", cbed%f_o2, (/"x","y","lev"/))
          call register_restart_field(fileobj, "cbed_om1", cbed%f_om1, (/"x","y","lev"/))
          call register_restart_field(fileobj, "cbed_om2", cbed%f_om2, (/"x","y","lev"/))
@@ -489,8 +487,6 @@ contains
       do k=1,nk_cbed+1; cbed_layers_i(k) = k; enddo
       id_layer_i = diag_axis_init('cbedlayer_i', cbed_layers_i, 'None', 'z', long_name='Benthos Layer Interface', direction=-1)
 
-      !cbed%id_tr1 = register_diag_field(package_name, 'cbed_tr1_conc', (/axes(1),axes(2),id_layer/), init_time,&
-      !   'cbed tracer1 concentration', 'unknown units', missing_value = missing_value1)
       cbed%id_o2 = register_diag_field(package_name, 'cbed_o2_conc', (/axes(1),axes(2),id_layer/), init_time,&
          'cbed oxygen concentration', 'mol m-3', missing_value = missing_value1)
       cbed%id_om1 = register_diag_field(package_name, 'cbed_om1_conc', (/axes(1),axes(2),id_layer/), init_time,&
@@ -631,8 +627,6 @@ contains
                cbed_tmask_i(i,j,k) = grid_tmask(i,j,nk) ; enddo; enddo; enddo
 
 
-      !used = send_data(cbed%id_tr1, cbed%f_tr1, model_time, rmask = cbed_tmask,&
-      !   is_in=isc, js_in=jsc,ie_in=iec, je_in=jec, ks_in=1, ke_in=nk_cbed)
       used = send_data(cbed%id_o2, cbed%f_o2, model_time, rmask = cbed_tmask,&
          is_in=isc, js_in=jsc,ie_in=iec, je_in=jec, ks_in=1, ke_in=nk_cbed)
       used = send_data(cbed%id_om1, cbed%f_om1, model_time, rmask = cbed_tmask,&
@@ -770,7 +764,6 @@ contains
          call register_field(fileobj, "y", "double", (/"y"/))
          call register_axis(fileobj,'lev',nk_cbed)
          ! register the restart variables
-         !call register_restart_field(fileobj, "cbed_tr1", cbed%f_tr1, (/"x","y","lev"/))
          call register_restart_field(fileobj, "cbed_o2", cbed%f_o2, (/"x","y","lev"/))
          call register_restart_field(fileobj, "cbed_om1", cbed%f_om1, (/"x","y","lev"/))
          call register_restart_field(fileobj, "cbed_om2", cbed%f_om2, (/"x","y","lev"/))
@@ -800,7 +793,6 @@ contains
       endif
 
       !Deallocate arrays
-      !deallocate(cbed%f_tr1)
       deallocate(cbed%f_o2)
       deallocate(cbed%f_om1)
       deallocate(cbed%f_om2)
@@ -1098,25 +1090,24 @@ contains
 
 
 
-   subroutine generic_CBED_sediments_update_from_source(cobalt_tracer_list, cobalt, phyto, ilb, jlb, mask_coast, &
-      grid_tmask, grid_dat, grid_kmt, isc,iec, jsc,jec, isd,ied, jsd,jed, nk, r_dt, dt, tau, model_time, frunoff, rho_dzt, dzt, internal_heat)
+   subroutine generic_CBED_update_from_source(cobalt_tracer_list, cobalt, phyto, ilb, jlb, mask_coast, &
+      grid_tmask, grid_kmt, isc,iec, jsc,jec, isd,ied, jsd,jed, nk, r_dt, dt, tau, model_time, rho_dzt, dzt, internal_heat)
 
       type(g_tracer_type),          pointer       :: cobalt_tracer_list
       type(generic_COBALT_type),    intent(inout) :: cobalt
       type(phytoplankton), dimension(NUM_PHYTO), intent(inout) :: phyto
       integer,                      intent(in)    :: ilb, jlb
-      real, dimension(ilb:,jlb:),   intent(in)    :: grid_dat
       real, dimension(:,:,:),       intent(in)    :: grid_tmask
       integer, dimension(:,:),      intent(in)    :: mask_coast, grid_kmt
       integer,                      intent(in)    :: isc,iec, jsc,jec, isd,ied, jsd,jed, nk
       real,                         intent(in)    :: r_dt, dt
       integer,                      intent(in)    :: tau
       type(time_type),              intent(in)    :: model_time
-      real, dimension(ilb:,jlb:),   intent(in)    :: frunoff
       real, dimension(ilb:,jlb:,:), intent(in)    :: rho_dzt, dzt
       real, dimension(ilb:,jlb:),   intent(in), optional :: internal_heat
 
       integer :: i, j, k
+      integer :: stdoutunit
       real :: fpoc_btm, drho_dzt, log10_fpoc_btm
       integer, dimension(isc:iec,jsc:jec) :: k_bot
       real,    dimension(isc:iec,jsc:jec) :: rho_dzt_bot
@@ -1139,7 +1130,7 @@ contains
       real, parameter :: ks_no3 = 0.001  ! NO3 half saturation constant (mol/m3)
 
       real, parameter :: k_nox = (2.0*10.0**5.0)/spery   ! 2e5 ! mol-1 m3 s-1 (from the original: mmol-1 L yr-1) !nitrification rate constant
-      real, parameter :: k_ana =  (10.0**5.0) /spery     !   ! 1e5               !anammox rate constant
+      real, parameter :: k_ana = (10.0**5.0) /spery     !   ! 1e5               !anammox rate constant
       real, parameter :: k_oduox = (10.0**5.0) /spery   !              1e6      !ODU oxidation rate constant
 
       real, parameter :: Q10 = 1.88
@@ -1159,7 +1150,7 @@ contains
       real, dimension(isc:iec,jsc:jec,nk_cbed) :: c_om1, c_om2, c_om3, c_o2, c_no3, c_nh4, c_dic, c_odu, c_talk, c_ca2, c_po4
 
       ! b terms
-      real, dimension(isc:iec,jsc:jec) :: b_o2, b_dic, b_nh4, b_no3, b_odu, b_alk, b_ca2, b_po4 
+      real, dimension(isc:iec,jsc:jec) :: b_o2, b_dic, b_nh4, b_no3, b_odu, b_alk, b_ca2, b_po4
       real, dimension(isc:iec,jsc:jec) :: b_o2_sub, b_dic_sub, b_nh4_sub, b_no3_sub, b_odu_sub, b_alk_sub, b_ca2_sub, b_po4_sub
 
       ! variables for sub-stepping reactions | adaptive time stepping for reactions
@@ -1181,109 +1172,96 @@ contains
             endif
          enddo; enddo
 
-      ! calculate Q10 factor
-      do j = jsc, jec; do i = isc, iec
-            if (grid_kmt(i,j) .gt. 0) then
-               Q10_factor(i,j) = Q10**( (cobalt%btm_temp(i,j)-4.0)/10.0 )
-            endif
-         enddo; enddo
-
-      ! calculate P:C ratio 
-      do j = jsc, jec; do i = isc, iec
-            if (grid_kmt(i,j) .gt. 0) then
-               p_2_c(i,j) = cobalt%fptot_btm(i,j)/(cobalt%fntot_btm(i,j)*cobalt%c_2_n + epsln)
-            endif
-         enddo; enddo
-
       ! Porosity and solid volume fraction read from file.
       if (cbed%read_porosity_from_file) then
          call data_override('OCN', 'por', por(isc:iec,jsc:jec,1), model_time)
 
-         do j = jsc, jec; do i = isc, iec
+         do j = jsc, jec
+            do i = isc, iec
                if (grid_kmt(i,j) .gt. 0) then
                   do k = 2, nk_cbed+1
                      por(i,j,k) = por(i,j,1)
                   enddo
-               endif
-            enddo; enddo
-         do j = jsc, jec; do i = isc, iec
-               if (grid_kmt(i,j) .gt. 0) then
+
                   do k = 1, nk_cbed+1
                      svf(i,j,k) = 1.0 - por(i,j,k)
                   enddo
+
                endif
-            enddo; enddo
+            enddo
+         enddo
       else
-         do j = jsc, jec; do i = isc, iec
+         do j = jsc, jec
+            do i = isc, iec
                if (grid_kmt(i,j) .gt. 0) then
                   do k = 1, nk_cbed+1
                      por(i,j,k) = 0.8
                      svf(i,j,k) = 0.2
                   enddo
                endif
-            enddo; enddo
+            enddo
+         enddo
          !por = 0.8
          !svf = 0.2
       endif
 
-      ! Sedimentation rate calculation
-      do j = jsc, jec; do i = isc, iec
+
+      ! calculate required parameters in i,j loop
+      do j = jsc, jec
+         do i = isc, iec
             if (grid_kmt(i,j) .gt. 0) then
+
+               !-------------------------
+               ! calculate Q10 factor
+               !-------------------------
+               Q10_factor(i,j) = Q10**( (cobalt%btm_temp(i,j)-4.0)/10.0 )
+
+               !-------------------------
+               ! calculate P:C ratio
+               !-------------------------
+               p_2_c(i,j) = cobalt%fptot_btm(i,j)/(cobalt%fntot_btm(i,j)*cobalt%c_2_n + epsln)
+
+               !----------------------------------
+               ! Sedimentation rate calculation
+               !----------------------------------
                do k = 1, nk_cbed+1
 
                   ! w (sedimentation rate, cm/year) m/s
-                  w(i,j,k) = ( (cobalt%fcadet_arag_btm(i,j)*100.0/2.71 + &
-                     cobalt%fcadet_calc_btm(i,j)*100.0/2.94 + &
+                  w(i,j,k) = ( (cobalt%f_cadet_arag_btf(i,j,1)*100.0/2.71 + &
+                     cobalt%f_cadet_calc_btf(i,j,1)*100.0/2.94 + &
                      cobalt%fsitot_btm(i,j)*60.0/2.65 + &
-                     cobalt%flithdet_btm(i,j)/2.65 + &
+                     cobalt%f_lithdet_btf(i,j,1)/2.65 + &
                      cobalt%ffetot_btm(i,j)*160.0/5.24 + &
                      cobalt%fptot_btm(i,j)*120.0/2.3 + &
                      cobalt%fntot_btm(i,j)*cobalt%c_2_n*22.4/0.9)/10000.0*spery/svf(i,j,k) )/100.0/spery
                enddo
-            endif
-         enddo;enddo
 
-      !Bioturbation
-      do j = jsc, jec; do i = isc, iec
-            if (grid_kmt(i,j) .gt. 0) then
+               !------------------
+               !Bioturbation
+               !------------------
                ! relation from Archer. POC flux unit in umol cm-2 y-1.
                Db_0(i,j) = ( 0.0232*((cobalt%fntot_btm(i,j)*cobalt%c_2_n *1e6/1e4*spery)**0.85) ) /1e4/spery ! in cobalt unit m2/s
-            endif
-         enddo;enddo
 
-      do j = jsc, jec; do i = isc, iec
-            if (grid_kmt(i,j) .gt. 0) then
                do k = 1, nk_cbed+1
                   ! relation from Archer. POC flux unit in umol cm-2 y-1.
-                  Db(i,j,k) = max(0.0, Db_0(i,j)*exp(-(z_cbed_int(k)/Db_l)**2)*(max(0.0,cobalt%btm_o2(i,j)*cobalt%Rho_0)/(max(0.0,cobalt%btm_o2(i,j)*cobalt%Rho_0)+(20/1e3))) )
+                  Db(i,j,k) = max(0.0, Db_0(i,j)*exp(-(z_cbed_int(k)/Db_l)**2.0)*(max(0.0,cobalt%btm_o2(i,j)*cobalt%Rho_0)/(max(0.0,cobalt%btm_o2(i,j)*cobalt%Rho_0)+(20.0/1e3))) )
                enddo
-            endif
-         enddo;enddo
 
-      !Bioirrigation
-      do j = jsc, jec; do i = isc, iec
-            if (grid_kmt(i,j) .gt. 0) then
+               !--------------------
+               ! Bioirrigation
+               !--------------------
                ! relation from Archer. POC flux unit in umol cm-2 y-1.
-               bioirri_0(i,j) = ( 11*(((atan((5*(cobalt%fntot_btm(i,j)*cobalt%c_2_n *1e6/1e4*spery) -400)/400))/pi)+0.5) &
-                  - 0.9 + 20*((max(0.0,cobalt%btm_o2(i,j)*cobalt%Rho_0))/(max(0.0,cobalt%btm_o2(i,j)*cobalt%Rho_0)+0.01)) * exp(-max(0.0,cobalt%btm_o2(i,j)*cobalt%Rho_0)/0.01) * &
-                  ((cobalt%fntot_btm(i,j)*cobalt%c_2_n *1e6/1e4*spery)/((cobalt%fntot_btm(i,j)*cobalt%c_2_n *1e6/1e4*spery)+30)) )/spery   ! in cobalt unit s^-1
-
-            endif
-         enddo;enddo
-
-      do j = jsc, jec; do i = isc, iec
-            do k = 1, nk_cbed
-               if (grid_kmt(i,j) .gt. 0) then
+               bioirri_0(i,j) = ( 11.0*(((atan((5.0*(cobalt%fntot_btm(i,j)*cobalt%c_2_n *1e6/1e4*spery) -400.0)/400.0))/pi)+0.5) &
+                  - 0.9 + 20.0*((max(0.0,cobalt%btm_o2(i,j)*cobalt%Rho_0))/(max(0.0,cobalt%btm_o2(i,j)*cobalt%Rho_0)+0.01)) * exp(-max(0.0,cobalt%btm_o2(i,j)*cobalt%Rho_0)/0.01) * &
+                  ((cobalt%fntot_btm(i,j)*cobalt%c_2_n *1e6/1e4*spery)/((cobalt%fntot_btm(i,j)*cobalt%c_2_n *1e6/1e4*spery)+30.0)) )/spery   ! in cobalt unit s^-1
+               do k = 1, nk_cbed
                   ! relation from Archer. POC flux unit in umol cm-2 y-1.
-                  bioirri(i,j,k) = max(0.0, bioirri_0(i,j)*exp(-(z_cbed_mid(k)/bioirri_l)**2) )
-               endif
-            enddo
-         enddo;enddo
+                  bioirri(i,j,k) = max(0.0, bioirri_0(i,j)*exp(-(z_cbed_mid(k)/bioirri_l)**2.0) )
+               enddo
 
-
-      !Calculate diffusion coefficients
-      do j = jsc, jec; do i = isc, iec
-            if (grid_kmt(i,j) .gt. 0) then
+               !-----------------------------------
+               !Calculate diffusion coefficients
+               !-----------------------------------
                do k = 1, nk_cbed+1
                   D_o2(i,j,k)  = ( (0.031558+0.001428*cobalt%btm_temp(i,j))/(1-2*log(por(i,j,k))) )/spery + Db(i,j,k)   ! m2/s
                   D_dic(i,j,k) = ( (0.015179+0.000795*cobalt%btm_temp(i,j))/(1-2*log(por(i,j,k))) )/spery + Db(i,j,k)
@@ -1302,45 +1280,23 @@ contains
 
 
                enddo
-            endif
-         enddo;enddo
 
-
-      !Calculate k1,k2,k3 [unit: s-1]
-      do j = jsc, jec; do i = isc, iec
-            if (grid_kmt(i,j) .gt. 0) then
+               !------------------
+               !Calculate OM decay rates. k1,k2,k3 [unit: s-1]
+               !------------------
                ! POC flux unit in umol cm-2 y-1. Unit of k is y-1
                k1(i,j) = ( 0.15*(cobalt%fntot_btm(i,j)*cobalt%c_2_n *1e6/1e4*spery)**(0.85) )/spery
                k2(i,j) = ( 0.0015*(cobalt%fntot_btm(i,j)*cobalt%c_2_n *1e6/1e4*spery)**(0.85) )/spery
                k3(i,j) = ( 0.00009*(cobalt%fntot_btm(i,j)*cobalt%c_2_n *1e6/1e4*spery)**(0.85) )/spery
-            endif
-         enddo;enddo
 
 
-      ! pass the b_terms calculated at t-1 timestep as b_terms
-      do j = jsc, jec; do i = isc, iec
-            if (grid_kmt(i,j) .gt. 0) then
-               b_o2(i,j) = cbed%cbed_b_o2_acc(i,j)
-               b_dic(i,j) = cbed%cbed_b_dic_acc(i,j)
-               b_nh4(i,j) = cbed%cbed_b_nh4_acc(i,j)
-               b_no3(i,j) = cbed%cbed_b_no3_acc(i,j)
-               b_odu(i,j) = cbed%cbed_b_odu_acc(i,j)
-               b_alk(i,j) = cbed%cbed_b_alk_acc(i,j)
-               b_ca2(i,j) = cbed%cbed_b_ca2_acc(i,j)
-               b_po4(i,j) = cbed%cbed_b_po4_acc(i,j)
-
-            endif
-         enddo;enddo
-
-
-
-      ! Set concentrations to be positive to avoid negative reaction rates.
-      ! This can happen when the tracer is very low and the change is large in one time step,
-      ! causing it to go negative in the next time step. Setting to zero prevents runaway reactions from negative concentrations.
-      ! Setting temporary variables to do that without changing the actual concentration fields, which are used in the diffusion-advection solver.
-      ! This way we can prevent negative concentrations from causing unrealistic reaction rates, while still allowing the diffusion-advection solver to bring the concentration back up in the next time step.
-      do j = jsc, jec; do i = isc, iec
-            if (grid_kmt(i,j) .gt. 0) then
+               !-----------------------
+               ! Set concentrations to be positive to avoid negative reaction rates.
+               ! This can happen when the tracer is very low and the change is large in one time step,
+               ! causing it to go negative in the next time step. Setting to zero prevents runaway reactions from negative concentrations.
+               ! Setting temporary variables to do that without changing the actual concentration fields, which are used in the diffusion-advection solver.
+               ! This way we can prevent negative concentrations from causing unrealistic reaction rates, while still allowing the diffusion-advection solver to bring the concentration back up in the next time step.
+               !------------------------
                do k = 1, nk_cbed
                   c_om1(i,j,k) = max(0.0, cbed%f_om1(i,j,k))
                   c_om2(i,j,k) = max(0.0, cbed%f_om2(i,j,k))
@@ -1354,13 +1310,10 @@ contains
                   c_ca2(i,j,k) = max(0.0, cbed%f_ca2(i,j,k))
                   c_po4(i,j,k) = max(0.0, cbed%f_po4(i,j,k))
                enddo
-            endif
-         enddo; enddo
 
-
-      ! ! calculate reaction rates
-      do j = jsc, jec; do i = isc, iec
-            if (grid_kmt(i,j) .gt. 0) then
+               !---------------------
+               ! calculate reaction rates
+               !----------------------
                do k = 1, nk_cbed
 
                   ! O₂ reaction rates
@@ -1389,9 +1342,9 @@ contains
                   odu_depo(i,j,k) = (R_om1_anoxic(i,j,k)+R_om2_anoxic(i,j,k)+R_om3_anoxic(i,j,k))*min(1.0, 0.233*(w(i,j,k)*100.0*spery)**0.336)
 
                   ! TA calculation
-                  R_talk(i,j,k) = svf(i,j,k)/por(i,j,k)*(1.0/cobalt%c_2_n)*(R_om1_o2(i,j,k) + R_om2_o2(i,j,k) + R_om3_o2(i,j,k)) + &
-                     svf(i,j,k)/por(i,j,k)*(0.8+1.0/cobalt%c_2_n)*(R_om1_no3(i,j,k) + R_om2_no3(i,j,k) + R_om3_no3(i,j,k)) + &
-                     svf(i,j,k)/por(i,j,k)*(1.0+1.0/cobalt%c_2_n)*(R_om1_anoxic(i,j,k)+R_om2_anoxic(i,j,k)+R_om3_anoxic(i,j,k)) - &
+                  R_talk(i,j,k) = svf(i,j,k)/por(i,j,k)*(1.0/cobalt%c_2_n - p_2_c(i,j))*(R_om1_o2(i,j,k) + R_om2_o2(i,j,k) + R_om3_o2(i,j,k)) + &
+                     svf(i,j,k)/por(i,j,k)*(0.8+1.0/cobalt%c_2_n - p_2_c(i,j))*(R_om1_no3(i,j,k) + R_om2_no3(i,j,k) + R_om3_no3(i,j,k)) + &
+                     svf(i,j,k)/por(i,j,k)*(1.0+1.0/cobalt%c_2_n - p_2_c(i,j))*(R_om1_anoxic(i,j,k)+R_om2_anoxic(i,j,k)+R_om3_anoxic(i,j,k)) - &
                      2.0*R_nox(i,j,k) - 1.0*R_oduox(i,j,k) - 0.4*R_ana(i,j,k)
 
                   ! calculations for diagnostics
@@ -1404,10 +1357,107 @@ contains
                   cbed%R_oduox(i,j,k) = R_oduox(i,j,k)
 
                   cbed%cbed_bioirri(i,j,k) = bioirri(i,j,k) ! bioirrigation diagnostics
-
                enddo
+
+
+               !-------------------
+               ! pass the b_terms calculated at t-1 timestep as b_terms
+               !---------------------
+               if (cbed%do_adaptive_time_stepping) then
+
+                  b_o2(i,j) = cbed%cbed_b_o2_acc(i,j)
+                  b_dic(i,j) = cbed%cbed_b_dic_acc(i,j)
+                  b_nh4(i,j) = cbed%cbed_b_nh4_acc(i,j)
+                  b_no3(i,j) = cbed%cbed_b_no3_acc(i,j)
+                  b_odu(i,j) = cbed%cbed_b_odu_acc(i,j)
+                  b_alk_org(i,j) = cbed%cbed_b_alk_org_acc(i,j)
+
+               else
+                  b_o2(i,j) = por(i,j,1)*D_o2(i,j,1)*((max(0.0,cobalt%btm_o2(i,j)*cobalt%Rho_0) - c_o2(i,j,1))/(dz_cbed(1)/2.0)) + &
+                     por(i,j,1)*w(i,j,1)*max(0.0,cobalt%btm_o2(i,j)*cobalt%Rho_0) + &
+                     sum(dz_cbed(:)*por(i,j,1:nk_cbed)* bioirri(i,j,:)*(max(0.0,cobalt%btm_o2(i,j)*cobalt%Rho_0) - c_o2(i,j,:)) )
+
+                  b_nh4(i,j) = por(i,j,1)*D_nh4(i,j,1)*((max(0.0,cobalt%f_nh4(i,j,nk)*cobalt%Rho_0) - c_nh4(i,j,1))/(dz_cbed(1)/2.0)) + &
+                     por(i,j,1)*w(i,j,1)*max(0.0,cobalt%f_nh4(i,j,nk)*cobalt%Rho_0) + &
+                     sum(dz_cbed(:)*por(i,j,1:nk_cbed)* bioirri(i,j,:)*(max(0.0,cobalt%f_nh4(i,j,nk)*cobalt%Rho_0) - c_nh4(i,j,:)) )
+
+                  b_no3(i,j) = por(i,j,1)*D_no3(i,j,1)*((max(0.0,cobalt%btm_no3(i,j)*cobalt%Rho_0) - c_no3(i,j,1))/(dz_cbed(1)/2.0)) + &
+                     por(i,j,1)*w(i,j,1)*max(0.0,cobalt%btm_no3(i,j)*cobalt%Rho_0) + &
+                     sum(dz_cbed(:)*por(i,j,1:nk_cbed)* bioirri(i,j,:)*(max(0.0,cobalt%btm_no3(i,j)*cobalt%Rho_0) - c_no3(i,j,:)) )
+
+                  b_dic(i,j) = por(i,j,1)*D_dic(i,j,1)*((max(0.0,cobalt%btm_dic(i,j)*cobalt%Rho_0) - c_dic(i,j,1))/(dz_cbed(1)/2.0)) + &
+                     por(i,j,1)*w(i,j,1)*max(0.0,cobalt%btm_dic(i,j)*cobalt%Rho_0) + &
+                     sum(dz_cbed(:)*por(i,j,1:nk_cbed)* bioirri(i,j,:)*(max(0.0,cobalt%btm_dic(i,j)*cobalt%Rho_0) - c_dic(i,j,:)) )
+
+                  b_odu(i,j) = por(i,j,1)*D_odu(i,j,1)*((abs(min(0.0,cobalt%btm_o2(i,j)*cobalt%Rho_0)) - c_odu(i,j,1))/(dz_cbed(1)/2.0)) + &
+                     por(i,j,1)*w(i,j,1)*abs(min(0.0,cobalt%btm_o2(i,j)*cobalt%Rho_0)) + &
+                     sum(dz_cbed(:)*por(i,j,1:nk_cbed)* bioirri(i,j,:)*(abs(min(0.0,cobalt%btm_o2(i,j)*cobalt%Rho_0)) - c_odu(i,j,:)) )
+
+                  b_alk_org(i,j) = sum(dz_cbed(:)*por(i,j,1:nk_cbed)*R_talk(i,j,:))
+               endif
+
+
+               !---------
+               ! save the benthic fluxes as diagnostics. 2D diag
+               !----------
+               cbed%o2_flux(i,j)  = b_o2(i,j)
+               cbed%nh4_flux(i,j) = b_nh4(i,j)
+               cbed%no3_flux(i,j) = b_no3(i,j)
+               cbed%dic_flux(i,j) = b_dic(i,j)
+
+               cbed%talk_flux(i,j) = por(i,j,1)*D_dic(i,j,1)*((max(0.0,cobalt%btm_alk(i,j)*cobalt%Rho_0) - c_talk(i,j,1))/(dz_cbed(1)/2.0)) + &
+                  por(i,j,1)*w(i,j,1)*max(0.0,cobalt%btm_alk(i,j)*cobalt%Rho_0) + &
+                  sum(dz_cbed(:)*por(i,j,1:nk_cbed)* bioirri(i,j,:)*(max(0.0,cobalt%btm_alk(i,j)*cobalt%Rho_0) - c_talk(i,j,:)) )
+
+               cbed%odu_flux(i,j) = b_odu(i,j)
+
+
+               !-----------------
+               !TOC (total organic carbon) diagnostics
+               !----------------
+               do k = 1, nk_cbed
+                  cbed%TOC(i,j,k)  = (c_om1(i,j,k)+c_om2(i,j,k)+c_om3(i,j,k))*12.0/1e6/rho_s*100.0
+               enddo
+
+               !-----------------
+               ! some other diags , other local variables
+               !-----------------
+               cbed%burial_om(i,j)  = (c_om1(i,j,nk_cbed)+c_om2(i,j,nk_cbed)+c_om3(i,j,nk_cbed))*w(i,j,nk_cbed+1) * svf(i,j,nk_cbed+1) ! mol/m2/s
+
+               cbed%denit(i,j) = sum(dz_cbed(:)*(svf(i,j,1:nk_cbed)*0.8*cbed%R_om_no3(i,j,:) + por(i,j,1:nk_cbed)*1.6*R_ana(i,j,:)))
+
+               !cbed%cbed_k1(i,j) = k1(i,j)
+               !cbed%cbed_k2(i,j) = k2(i,j)
+               !cbed%cbed_k3(i,j) = k3(i,j)
+               cbed%cbed_w(i,j) = w(i,j,1)
+
+               !------------------------------
+               ! some other local variables
+               !------------------------------
+               cbed_burial_frac(i,j) = max(0.0, cbed%burial_om(i,j)/(cobalt%fntot_btm(i,j)*cobalt%c_2_n + epsln) )  ! burial / rain . ratio
+
+               cbed_org_alk(i,j) = sum(dz_cbed(:)*por(i,j,1:nk_cbed)*R_talk(i,j,:))  ! mol m-2 s-1 (net production of alklinity from organic matter degradation)
+
+
+               !--------------------------
+               ! some more diags
+               !--------------------------
+               do k = 1, nk_cbed+1
+                  cbed%cbed_Db(i,j,k) = Db(i,j,k)
+                  cbed%cbed_D_o2(i,j,k) = D_o2(i,j,k)
+                  cbed%cbed_D_nh4(i,j,k) = D_nh4(i,j,k)
+                  cbed%cbed_D_no3(i,j,k) = D_no3(i,j,k)
+                  cbed%cbed_D_dic(i,j,k) = D_dic(i,j,k)
+                  cbed%cbed_D_odu(i,j,k) = D_odu(i,j,k)
+                  cbed%cbed_por(i,j,k) = por(i,j,k)
+                  cbed%cbed_svf(i,j,k) = svf(i,j,k)
+               enddo
+
+
             endif
-         enddo;enddo
+         enddo
+      enddo    ! i,j loop
+
 
       ! Calculate the "b terms" to feed into cobalt.
       ! The b terms are calulated based on the t-1 time step. This is to maintain mass balance
@@ -1425,111 +1475,60 @@ contains
 
       ! further modification related to b_o2, b_dic etc is done when it is passed to cobalt%b_* at the end of the code.
 
-      ! do j = jsc, jec; do i = isc, iec
-      !       if (grid_kmt(i,j) .gt. 0) then
-      !          b_o2(i,j) = por(i,j,1)*D_o2(i,j,1)*((cobalt%btm_o2(i,j)*cobalt%Rho_0 - c_o2(i,j,1))/(dz_cbed(1)/2.0)) + &
-      !             por(i,j,1)*w(i,j,1)*(cobalt%btm_o2(i,j)*cobalt%Rho_0) + &
-      !             sum(dz_cbed(:)*por(i,j,1:nk_cbed)* bioirri(i,j,:)*(cobalt%btm_o2(i,j)*cobalt%Rho_0 - c_o2(i,j,:)) )
+      ! ! calculate the b_terms
+      ! if ( .not. cbed%do_adaptive_time_stepping) then
+      !    do j = jsc, jec; do i = isc, iec
+      !          if (grid_kmt(i,j) .gt. 0) then
 
-      !          b_nh4(i,j) = por(i,j,1)*D_nh4(i,j,1)*((cobalt%f_nh4(i,j,nk)*cobalt%Rho_0 - c_nh4(i,j,1))/(dz_cbed(1)/2.0)) + &
-      !             por(i,j,1)*w(i,j,1)*(cobalt%f_nh4(i,j,nk)*cobalt%Rho_0) + &
-      !             sum(dz_cbed(:)*por(i,j,1:nk_cbed)* bioirri(i,j,:)*(cobalt%f_nh4(i,j,nk)*cobalt%Rho_0 - c_nh4(i,j,:)) )
+      !             b_o2(i,j) = por(i,j,1)*D_o2(i,j,1)*((max(0.0,cobalt%btm_o2(i,j)*cobalt%Rho_0) - c_o2(i,j,1))/(dz_cbed(1)/2.0)) + &
+      !                por(i,j,1)*w(i,j,1)*max(0.0,cobalt%btm_o2(i,j)*cobalt%Rho_0) + &
+      !                sum(dz_cbed(:)*por(i,j,1:nk_cbed)* bioirri(i,j,:)*(max(0.0,cobalt%btm_o2(i,j)*cobalt%Rho_0) - c_o2(i,j,:)) )
 
-      !          b_no3(i,j) = por(i,j,1)*D_no3(i,j,1)*((cobalt%btm_no3(i,j)*cobalt%Rho_0 - c_no3(i,j,1))/(dz_cbed(1)/2.0)) + &
-      !             por(i,j,1)*w(i,j,1)*(cobalt%btm_no3(i,j)*cobalt%Rho_0) + &
-      !             sum(dz_cbed(:)*por(i,j,1:nk_cbed)* bioirri(i,j,:)*(cobalt%btm_no3(i,j)*cobalt%Rho_0 - c_no3(i,j,:)) )
+      !             b_nh4(i,j) = por(i,j,1)*D_nh4(i,j,1)*((max(0.0,cobalt%f_nh4(i,j,nk)*cobalt%Rho_0) - c_nh4(i,j,1))/(dz_cbed(1)/2.0)) + &
+      !                por(i,j,1)*w(i,j,1)*max(0.0,cobalt%f_nh4(i,j,nk)*cobalt%Rho_0) + &
+      !                sum(dz_cbed(:)*por(i,j,1:nk_cbed)* bioirri(i,j,:)*(max(0.0,cobalt%f_nh4(i,j,nk)*cobalt%Rho_0) - c_nh4(i,j,:)) )
 
-      !          b_dic(i,j) = por(i,j,1)*D_dic(i,j,1)*((cobalt%btm_dic(i,j)*cobalt%Rho_0 - c_dic(i,j,1))/(dz_cbed(1)/2.0)) + &
-      !             por(i,j,1)*w(i,j,1)*(cobalt%btm_dic(i,j)*cobalt%Rho_0) + &
-      !             sum(dz_cbed(:)*por(i,j,1:nk_cbed)* bioirri(i,j,:)*(cobalt%btm_dic(i,j)*cobalt%Rho_0 - c_dic(i,j,:)) )
+      !             b_no3(i,j) = por(i,j,1)*D_no3(i,j,1)*((max(0.0,cobalt%btm_no3(i,j)*cobalt%Rho_0) - c_no3(i,j,1))/(dz_cbed(1)/2.0)) + &
+      !                por(i,j,1)*w(i,j,1)*max(0.0,cobalt%btm_no3(i,j)*cobalt%Rho_0) + &
+      !                sum(dz_cbed(:)*por(i,j,1:nk_cbed)* bioirri(i,j,:)*(max(0.0,cobalt%btm_no3(i,j)*cobalt%Rho_0) - c_no3(i,j,:)) )
 
-      !          b_odu(i,j) = por(i,j,1)*D_odu(i,j,1)*((0.0 - c_odu(i,j,1))/(dz_cbed(1)/2.0)) + &
-      !             sum(dz_cbed(:)*por(i,j,1:nk_cbed)* bioirri(i,j,:)*(0.0 - c_odu(i,j,:)) )
+      !             b_dic(i,j) = por(i,j,1)*D_dic(i,j,1)*((max(0.0,cobalt%btm_dic(i,j)*cobalt%Rho_0) - c_dic(i,j,1))/(dz_cbed(1)/2.0)) + &
+      !                por(i,j,1)*w(i,j,1)*max(0.0,cobalt%btm_dic(i,j)*cobalt%Rho_0) + &
+      !                sum(dz_cbed(:)*por(i,j,1:nk_cbed)* bioirri(i,j,:)*(max(0.0,cobalt%btm_dic(i,j)*cobalt%Rho_0) - c_dic(i,j,:)) )
 
-      !          !b_odu(i,j) =  -1.0e-5
-      !          !b_odu(i,j) = max(b_odu(i,j), -1.0e-6 )
+      !             b_odu(i,j) = por(i,j,1)*D_odu(i,j,1)*((abs(min(0.0,cobalt%btm_o2(i,j)*cobalt%Rho_0)) - c_odu(i,j,1))/(dz_cbed(1)/2.0)) + &
+      !                por(i,j,1)*w(i,j,1)*abs(min(0.0,cobalt%btm_o2(i,j)*cobalt%Rho_0)) + &
+      !                sum(dz_cbed(:)*por(i,j,1:nk_cbed)* bioirri(i,j,:)*(abs(min(0.0,cobalt%btm_o2(i,j)*cobalt%Rho_0)) - c_odu(i,j,:)) )
 
-      !          ! ! check if there is any NaN or inf in b_odu. not required. can be deleted.
-      !          ! if (ieee_is_nan(b_odu(i,j)) .or. .not. ieee_is_finite(b_odu(i,j))) then
-      !          !    b_odu(i,j) = 0.0
-      !          ! endif
+      !             b_alk_org(i,j) = sum(dz_cbed(:)*por(i,j,1:nk_cbed)*R_talk(i,j,:))
 
-
-      !       endif
-      !    enddo;enddo
-
-      ! save the benthic fluxes as diagnostics. 2D diag
-      do j = jsc, jec; do i = isc, iec
-            if (grid_kmt(i,j) .gt. 0) then
-
-               cbed%o2_flux(i,j)  = b_o2(i,j)
-               cbed%nh4_flux(i,j) = b_nh4(i,j)
-               cbed%no3_flux(i,j) = b_no3(i,j)
-               cbed%dic_flux(i,j) = b_dic(i,j)
-
-               cbed%talk_flux(i,j) = por(i,j,1)*D_dic(i,j,1)*((max(0.0,cobalt%btm_alk(i,j)*cobalt%Rho_0) - c_talk(i,j,1))/(dz_cbed(1)/2.0)) + &
-                  por(i,j,1)*w(i,j,1)*max(0.0,cobalt%btm_alk(i,j)*cobalt%Rho_0) + &
-                  sum(dz_cbed(:)*por(i,j,1:nk_cbed)* bioirri(i,j,:)*(max(0.0,cobalt%btm_alk(i,j)*cobalt%Rho_0) - c_talk(i,j,:)) )
-
-               cbed%odu_flux(i,j) = b_odu(i,j)
-
-            endif
-         enddo;enddo
+      !          endif
+      !       enddo;enddo
+      ! endif
 
 
-      !TOC (total organic carbon) diagnostics
-      do j = jsc, jec; do i = isc, iec
-            if (grid_kmt(i,j) .gt. 0) then
-               do k = 1, nk_cbed
-                  cbed%TOC(i,j,k)  = (c_om1(i,j,k)+c_om2(i,j,k)+c_om3(i,j,k))*12.0/1e6/rho_s*100.0
-               enddo
-            endif
-         enddo;enddo
-
-      ! some other diags , other local variables
-      do j = jsc, jec; do i = isc, iec
-            if (grid_kmt(i,j) .gt. 0) then
-
-               cbed%burial_om(i,j)  = (c_om1(i,j,nk_cbed)+c_om2(i,j,nk_cbed)+c_om3(i,j,nk_cbed))*w(i,j,nk_cbed+1) * svf(i,j,nk_cbed+1) ! mol/m2/s
-
-               cbed%denit(i,j) = sum(dz_cbed(:)*(svf(i,j,1:nk_cbed)*0.8*cbed%R_om_no3(i,j,:) + por(i,j,1:nk_cbed)*1.6*R_ana(i,j,:)))
-
-               !cbed%cbed_k1(i,j) = k1(i,j)
-               !cbed%cbed_k2(i,j) = k2(i,j)
-               !cbed%cbed_k3(i,j) = k3(i,j)
-               cbed%cbed_w(i,j) = w(i,j,1)
-
-            endif
-         enddo;enddo
-
-      ! some other local variables
-      do j = jsc, jec; do i = isc, iec
-            if (grid_kmt(i,j) .gt. 0) then
-
-               cbed_burial_frac(i,j) = max(0.0, cbed%burial_om(i,j)/(cobalt%fntot_btm(i,j)*cobalt%c_2_n + epsln) )  ! burial / rain . ratio
-
-               cbed_org_alk(i,j) = sum(dz_cbed(:)*por(i,j,1:nk_cbed)*R_talk(i,j,:))  ! mol m-2 s-1 (net production of alklinity from organic matter degradation)
-
-            endif
-         enddo;enddo
-
-      ! some more diags
-      do j = jsc, jec; do i = isc, iec
-            if (grid_kmt(i,j) .gt. 0) then
-               do k = 1, nk_cbed+1
-                  cbed%cbed_Db(i,j,k) = Db(i,j,k)
-                  cbed%cbed_D_o2(i,j,k) = D_o2(i,j,k)
-                  cbed%cbed_D_nh4(i,j,k) = D_nh4(i,j,k)
-                  cbed%cbed_D_no3(i,j,k) = D_no3(i,j,k)
-                  cbed%cbed_D_dic(i,j,k) = D_dic(i,j,k)
-                  cbed%cbed_D_odu(i,j,k) = D_odu(i,j,k)
-                  cbed%cbed_por(i,j,k) = por(i,j,k)
-                  cbed%cbed_svf(i,j,k) = svf(i,j,k)
-               enddo
-            endif
-         enddo;enddo
-
-
+      ! ! test for adaptive time-step off. delete this later
+      ! !n_sub = 1
+      ! cbed%cbed_b_o2_acc = 0.0
+      ! cbed%cbed_b_dic_acc = 0.0
+      ! cbed%cbed_b_nh4_acc = 0.0
+      ! cbed%cbed_b_no3_acc = 0.0
+      ! cbed%cbed_b_alk_org_acc = 0.0
+      ! cbed%cbed_b_odu_acc = 0.0
+      ! if ( .not. cbed%do_adaptive_time_stepping) then
+      !    do j = jsc, jec
+      !       do i = isc, iec
+      !          if (grid_kmt(i,j) > 0) then
+      !             cbed%cbed_b_o2_acc(i,j) = 0.0
+      !             cbed%cbed_b_dic_acc(i,j) = 0.0
+      !             cbed%cbed_b_nh4_acc(i,j) = 0.0
+      !             cbed%cbed_b_no3_acc(i,j) = 0.0
+      !             cbed%cbed_b_alk_org_acc(i,j) = 0.0
+      !             cbed%cbed_b_odu_acc(i,j) = 0.0
+      !          endif
+      !       enddo
+      !    enddo
+      ! endif
 
 
       ! ask NIKI: if this would lead to different ans due to indexing and domain decomposition.
@@ -1668,9 +1667,9 @@ contains
                         odu_depo(i,j,k) = (R_om1_anoxic(i,j,k)+R_om2_anoxic(i,j,k)+R_om3_anoxic(i,j,k))*min(1.0, 0.233*(w(i,j,k)*100.0*spery)**0.336)
 
                         ! TA calculation
-                        R_talk(i,j,k) = svf(i,j,k)/por(i,j,k)*(1.0/cobalt%c_2_n)*(R_om1_o2(i,j,k) + R_om2_o2(i,j,k) + R_om3_o2(i,j,k)) + &
-                           svf(i,j,k)/por(i,j,k)*(0.8+1.0/cobalt%c_2_n)*(R_om1_no3(i,j,k) + R_om2_no3(i,j,k) + R_om3_no3(i,j,k)) + &
-                           svf(i,j,k)/por(i,j,k)*(1.0+1.0/cobalt%c_2_n)*(R_om1_anoxic(i,j,k)+R_om2_anoxic(i,j,k)+R_om3_anoxic(i,j,k)) - &
+                        R_talk(i,j,k) = svf(i,j,k)/por(i,j,k)*(1.0/cobalt%c_2_n - p_2_c(i,j))*(R_om1_o2(i,j,k) + R_om2_o2(i,j,k) + R_om3_o2(i,j,k)) + &
+                           svf(i,j,k)/por(i,j,k)*(0.8+1.0/cobalt%c_2_n - p_2_c(i,j))*(R_om1_no3(i,j,k) + R_om2_no3(i,j,k) + R_om3_no3(i,j,k)) + &
+                           svf(i,j,k)/por(i,j,k)*(1.0+1.0/cobalt%c_2_n - p_2_c(i,j))*(R_om1_anoxic(i,j,k)+R_om2_anoxic(i,j,k)+R_om3_anoxic(i,j,k)) - &
                            2.0*R_nox(i,j,k) - 1.0*R_oduox(i,j,k) - 0.4*R_ana(i,j,k)
 
                      enddo !k
@@ -1700,7 +1699,7 @@ contains
                      b_alk_sub(i,j) = sum(dz_cbed(:)*por(i,j,1:nk_cbed)*R_talk(i,j,:))  ! mol m-2 s-1 (net production of alklinity from organic matter degradation)
 
                      b_ca2_sub(i,j) = 0.0
-                     b_po4_sub(i,j) = 0.0 
+                     b_po4_sub(i,j) = 0.0
 
                      !b_odu_sub(i,j) =  -1.0e-5
                      !b_odu_sib(i,j) = max(b_odu_sub(i,j), -1.0e-6 )
@@ -1755,7 +1754,7 @@ contains
 
                         cbed%f_arag(i,j,k) = cbed%f_arag(i,j,k)
 
-                        cbed%f_ca2(i,j,k) = cbed%f_ca2(i,j,k) 
+                        cbed%f_ca2(i,j,k) = cbed%f_ca2(i,j,k)
 
                         cbed%f_po4(i,j,k) = cbed%f_po4(i,j,k) + ( + svf(i,j,k)/por(i,j,k)*p_2_c(i,j)*(R_dic_om1(i,j,k) + R_dic_om2(i,j,k) + R_dic_om3(i,j,k)) + bioirri(i,j,k)*(max(0.0,cobalt%f_po4(i,j,nk)*cobalt%Rho_0) - c_po4(i,j,k)) )*dt_sub(i,j)
 
@@ -1788,15 +1787,14 @@ contains
 
 
       else
-         ! Source-sink calculations
-         do j = jsc, jec; do i = isc, iec  !{
+         ! Source-sink calculations (no adaptive time-stepping)
+         do j = jsc, jec
+            do i = isc, iec
                if (grid_kmt(i,j) .gt. 0) then
                   do k = 1, nk_cbed
 
-                     !cbed%f_tr1(i,j,k) = cbed%f_tr1(i,j,k) + 0.01 * k !fictitious dubious dynamics for testing purposes
-
                      cbed%f_o2(i,j,k)  = cbed%f_o2(i,j,k) + ( - svf(i,j,k)/por(i,j,k)*(R_om1_o2(i,j,k) + R_om2_o2(i,j,k) + R_om3_o2(i,j,k)) - &
-                        (2.0*R_nox(i,j,k)+R_oduox(i,j,k)) + bioirri(i,j,k)*(cobalt%btm_o2(i,j)*cobalt%Rho_0 - c_o2(i,j,k)) )*dt
+                        (2.0*R_nox(i,j,k)+R_oduox(i,j,k)) + bioirri(i,j,k)*(max(0.0,cobalt%btm_o2(i,j)*cobalt%Rho_0) - c_o2(i,j,k)) )*dt
 
                      cbed%f_om1(i,j,k) = cbed%f_om1(i,j,k) + ( - (R_om1_o2(i,j,k) + R_om1_no3(i,j,k) + R_om1_anoxic(i,j,k)) )*dt
 
@@ -1805,23 +1803,23 @@ contains
                      cbed%f_om3(i,j,k) = cbed%f_om3(i,j,k) + ( - (R_om3_o2(i,j,k) + R_om3_no3(i,j,k) + R_om3_anoxic(i,j,k)) )*dt
 
                      cbed%f_nh4(i,j,k) = cbed%f_nh4(i,j,k) + ( + svf(i,j,k)/por(i,j,k)*(1.0/cobalt%c_2_n)*(R_dic_om1(i,j,k) + R_dic_om2(i,j,k) + R_dic_om3(i,j,k)) + &
-                        ( - R_nox(i,j,k) - R_ana(i,j,k)) + bioirri(i,j,k)*(cobalt%f_nh4(i,j,nk)*cobalt%Rho_0 - c_nh4(i,j,k)) )*dt
+                        ( - R_nox(i,j,k) - R_ana(i,j,k)) + bioirri(i,j,k)*(max(0.0,cobalt%f_nh4(i,j,nk)*cobalt%Rho_0) - c_nh4(i,j,k)) )*dt
 
                      cbed%f_no3(i,j,k) = cbed%f_no3(i,j,k) + ( - svf(i,j,k)/por(i,j,k)*0.8*(R_om1_no3(i,j,k) + R_om2_no3(i,j,k) + R_om3_no3(i,j,k)) + &
-                        (R_nox(i,j,k) - 0.6*R_ana(i,j,k)) + bioirri(i,j,k)*(cobalt%btm_no3(i,j)*cobalt%Rho_0 - c_no3(i,j,k)) )*dt
+                        (R_nox(i,j,k) - 0.6*R_ana(i,j,k)) + bioirri(i,j,k)*(max(0.0,cobalt%btm_no3(i,j)*cobalt%Rho_0) - c_no3(i,j,k)) )*dt
 
                      cbed%f_dic(i,j,k) = cbed%f_dic(i,j,k) + ( + svf(i,j,k)/por(i,j,k)*(R_dic_om1(i,j,k) + R_dic_om2(i,j,k) + R_dic_om3(i,j,k)) + &
-                        bioirri(i,j,k)*(cobalt%btm_dic(i,j)*cobalt%Rho_0 - c_dic(i,j,k)) )*dt
+                        bioirri(i,j,k)*(max(0.0,cobalt%btm_dic(i,j)*cobalt%Rho_0) - c_dic(i,j,k)) )*dt
 
                      cbed%f_odu(i,j,k) = cbed%f_odu(i,j,k) + ( + svf(i,j,k)/por(i,j,k)*(R_om1_anoxic(i,j,k)+R_om2_anoxic(i,j,k)+R_om3_anoxic(i,j,k)) - &
-                        R_oduox(i,j,k) - svf(i,j,k)/por(i,j,k)*odu_depo(i,j,k)  + bioirri(i,j,k)*(0.0 - c_odu(i,j,k)) )*dt
+                        R_oduox(i,j,k) - svf(i,j,k)/por(i,j,k)*odu_depo(i,j,k)  + bioirri(i,j,k)*(abs(min(0.0,cobalt%btm_o2(i,j)*cobalt%Rho_0)) - c_odu(i,j,k)) )*dt
 
-                     cbed%f_talk(i,j,k) = cbed%f_talk(i,j,k) + ( + R_talk(i,j,k) + bioirri(i,j,k)*(cobalt%btm_alk(i,j)*cobalt%Rho_0 - c_talk(i,j,k)) )*dt
-
+                     cbed%f_talk(i,j,k) = cbed%f_talk(i,j,k) + ( + R_talk(i,j,k) + bioirri(i,j,k)*(max(0.0,cobalt%btm_alk(i,j)*cobalt%Rho_0) - c_talk(i,j,k)) )*dt
 
                   enddo
                endif
-            enddo;enddo
+            enddo
+         enddo
 
 
          ! call vertdiff_CBED. This updates the fields.
@@ -2100,6 +2098,24 @@ contains
 
       ! endif
 
+      !------------------
+      ! Write checksum
+      !------------------
+      stdoutunit=stdout()
+      !write(stdoutunit,'("cbedsums: ",Z16.16,ES24.16)') sum(cbed%f_o2(:,:,:)),sum(cbed%f_dic(:,:,:)),sum(cbed%f_om2(:,:,:))
+
+      ! Print Oxygen (f_o2) sum
+      write(stdoutunit,'("cbedsum f_o2:  ",Z16.16,1X,ES24.16)') &
+         sum(cbed%f_o2(:,:,:)), sum(cbed%f_o2(:,:,:))
+
+      ! Print Dissolved Inorganic Carbon (f_dic) sum
+      write(stdoutunit,'("cbedsum f_dic: ",Z16.16,1X,ES24.16)') &
+         sum(cbed%f_dic(:,:,:)), sum(cbed%f_dic(:,:,:))
+
+      ! Print Organic Matter (f_om2) sum
+      write(stdoutunit,'("cbedsum f_om2: ",Z16.16,1X,ES24.16)') &
+         sum(cbed%f_om2(:,:,:)), sum(cbed%f_om2(:,:,:))
+
 
 
 
@@ -2116,51 +2132,6 @@ contains
       do j = jsc, jec; do i = isc, iec  !{
             if (grid_kmt(i,j) .gt. 0) then !{
 
-               ! Add the phytoplankton fluxes to the detritus fluxes to get total flux to benthos
-               cobalt%fntot_btm(i,j) = cobalt%f_ndet_btf(i,j,1) + cobalt%f_ndi_btf(i,j,1) + &
-                  cobalt%f_nsm_btf(i,j,1) + cobalt%f_nmd_btf(i,j,1) + cobalt%f_nlg_btf(i,j,1)
-               cobalt%fptot_btm(i,j) = cobalt%f_pdet_btf(i,j,1) + cobalt%f_pdi_btf(i,j,1) + &
-                  cobalt%f_psm_btf(i,j,1) + cobalt%f_pmd_btf(i,j,1) + cobalt%f_plg_btf(i,j,1)
-               cobalt%ffetot_btm(i,j) = cobalt%f_fedet_btf(i,j,1) + cobalt%f_fedi_btf(i,j,1) + &
-                  cobalt%f_fesm_btf(i,j,1) + cobalt%f_femd_btf(i,j,1) + cobalt%f_felg_btf(i,j,1)
-               cobalt%fsitot_btm(i,j) = cobalt%f_sidet_btf(i,j,1) + cobalt%f_silg_btf(i,j,1) + &
-                  cobalt%f_simd_btf(i,j,1)
-
-               ! Calculate the values of tracers influencing the sedimentary transformations
-               ! and fluxes over a layer defined by "bottom_thickess".
-               rho_dzt_bot(i,j) = 0.0
-               cobalt%btm_o2(i,j) = 0.0
-               cobalt%btm_no3(i,j) = 0.0
-               cobalt%btm_co3_sol_calc(i,j) = 0.0
-               cobalt%btm_co3_ion(i,j) = 0.0
-               cobalt%btm_omega_calc(i,j) = 0.0
-               k_bot(i,j) = 0
-               ! Note that grid_kmt is always the total number of layers in MOM6
-               do k = grid_kmt(i,j),1,-1   !{
-                  ! Check if the top of layer k is within the bottom thickness.  If so, include its properties in the bottom
-                  ! layer averages.  Overshoots will be subtracted off later.
-                  if (rho_dzt_bot(i,j).lt.(cobalt%Rho_0*cobalt%bottom_thickness)) then
-                     k_bot(i,j) = k
-                     rho_dzt_bot(i,j) = rho_dzt_bot(i,j) + rho_dzt(i,j,k)
-                     cobalt%btm_o2(i,j) = cobalt%btm_o2(i,j) + cobalt%f_o2(i,j,k)*rho_dzt(i,j,k)
-                     cobalt%btm_no3(i,j) = cobalt%btm_no3(i,j) + cobalt%f_no3(i,j,k)*rho_dzt(i,j,k)
-                     cobalt%btm_co3_sol_calc(i,j) = cobalt%btm_co3_sol_calc(i,j) + cobalt%co3_sol_calc(i,j,k)*rho_dzt(i,j,k)
-                     cobalt%btm_co3_ion(i,j) = cobalt%btm_co3_ion(i,j) + cobalt%f_co3_ion(i,j,k)*rho_dzt(i,j,k)
-                  endif
-               enddo
-               ! Subtract off overshoot
-               drho_dzt = rho_dzt_bot(i,j) - cobalt%Rho_0*cobalt%bottom_thickness
-               cobalt%btm_o2(i,j)=cobalt%btm_o2(i,j)-cobalt%f_o2(i,j,k_bot(i,j))*drho_dzt
-               cobalt%btm_no3(i,j)=cobalt%btm_no3(i,j)-cobalt%f_no3(i,j,k_bot(i,j))*drho_dzt
-               cobalt%btm_co3_sol_calc(i,j)=cobalt%btm_co3_sol_calc(i,j)-cobalt%co3_sol_calc(i,j,k_bot(i,j))*drho_dzt
-               cobalt%btm_co3_ion(i,j)=cobalt%btm_co3_ion(i,j)-cobalt%f_co3_ion(i,j,k_bot(i,j))*drho_dzt
-               ! convert back to moles kg-1
-               cobalt%btm_o2(i,j)=cobalt%btm_o2(i,j)/(cobalt%bottom_thickness*cobalt%Rho_0)
-               cobalt%btm_no3(i,j)=cobalt%btm_no3(i,j)/(cobalt%bottom_thickness*cobalt%Rho_0)
-               cobalt%btm_co3_sol_calc(i,j)=cobalt%btm_co3_sol_calc(i,j)/(cobalt%bottom_thickness*cobalt%Rho_0)
-               cobalt%btm_co3_ion(i,j)=cobalt%btm_co3_ion(i,j)/(cobalt%bottom_thickness*cobalt%Rho_0)
-               ! calculate the saturation state with respect to calcite for subsequent calculations
-               cobalt%btm_omega_calc(i,j)=cobalt%btm_co3_ion(i,j)/cobalt%btm_co3_sol_calc(i,j)
 
                ! Calculate the processing of organic matter in the sediment.  The fate of organic matter is partitioned
                ! between burial (i.e., removal from the system), aerobic remineralization, remineralization via
@@ -2419,7 +2390,7 @@ contains
 
 
 
-      ! set the cobalt%b_* terms. These are used in some other places in COBALT as well. So just "b_*" might not work.
+      ! ! set the cobalt%b_* terms. These are used in some other places in COBALT as well. So just "b_*" might not work.
       do j = jsc, jec; do i = isc, iec
             if (grid_kmt(i,j) .gt. 0) then
 
@@ -2464,6 +2435,6 @@ contains
       call g_tracer_set_values(cobalt_tracer_list,'po4',  'btf', cobalt%b_po4 ,isd,jsd)
       call g_tracer_set_values(cobalt_tracer_list,'sio4', 'btf', cobalt%b_sio4,isd,jsd)
 
-   end subroutine generic_CBED_sediments_update_from_source
+   end subroutine generic_CBED_update_from_source
 
 end module generic_CBED

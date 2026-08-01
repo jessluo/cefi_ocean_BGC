@@ -5135,13 +5135,6 @@ contains
 ! 5: Sediment, coastal and ice dynamics
 !-------------------------------------------------------------------------------------------------
 !
-    
-    if (do_CBED) then
-      !Note that CBED subroutine MUST set the '_btm' fluxes
-      call generic_CBED_sediments_update_from_source(tracer_list, cobalt, phyto, ilb, jlb, mask_coast, &
-           grid_tmask, grid_dat, grid_kmt, isc,iec, jsc,jec, isd,ied, jsd,jed, nk, r_dt, dt, tau, model_time, frunoff, rho_dzt, dzt, internal_heat)
-    else
-
 
     ! Nutrient inputs associated with icebergs/frozen runoff.  This is currently entered in the top grid cell.  The
     ! parameters "jfe_iceberg_ratio", "jno3_iceberg_ratio" and "jpo4_iceberg_ratio" are the ratios of nutrient input
@@ -5158,6 +5151,7 @@ contains
        endif !}
     enddo; enddo  !} i,j
 
+      
     ! Calculate the bottom conditions and the fluxes to the bottom for diagnostics and benthic flux calculations.
     ! MOM4/5 used the bottom grid cell, but MOM6 often has a number of vanishingly thin layers overlying the bottom.
     ! Grid scale noise in these layers can occur, particularly for quantities with large bottom fluxes.  COBALT thus
@@ -5183,8 +5177,11 @@ contains
           ! Calculate the values of tracers influencing the sedimentary transformations
           ! and fluxes over a layer defined by "bottom_thickess".
           rho_dzt_bot(i,j) = 0.0
+          cobalt%btm_temp(i,j) = 0.0
           cobalt%btm_o2(i,j) = 0.0
           cobalt%btm_no3(i,j) = 0.0
+          cobalt%btm_dic(i,j) = 0.0
+          cobalt%btm_alk(i,j) = 0.0
           cobalt%btm_co3_sol_calc(i,j) = 0.0
           cobalt%btm_co3_ion(i,j) = 0.0
           cobalt%btm_omega_calc(i,j) = 0.0
@@ -5196,25 +5193,52 @@ contains
             if (rho_dzt_bot(i,j).lt.(cobalt%Rho_0*cobalt%bottom_thickness)) then
               k_bot(i,j) = k
               rho_dzt_bot(i,j) = rho_dzt_bot(i,j) + rho_dzt(i,j,k)
+              cobalt%btm_temp(i,j) = cobalt%btm_temp(i,j) + Temp(i,j,k)*rho_dzt(i,j,k)
               cobalt%btm_o2(i,j) = cobalt%btm_o2(i,j) + cobalt%f_o2(i,j,k)*rho_dzt(i,j,k)
               cobalt%btm_no3(i,j) = cobalt%btm_no3(i,j) + cobalt%f_no3(i,j,k)*rho_dzt(i,j,k)
+              cobalt%btm_alk(i,j) = cobalt%btm_alk(i,j) + cobalt%f_alk(i,j,k)*rho_dzt(i,j,k)
+              cobalt%btm_dic(i,j) = cobalt%btm_dic(i,j) + cobalt%f_dic(i,j,k)*rho_dzt(i,j,k)
               cobalt%btm_co3_sol_calc(i,j) = cobalt%btm_co3_sol_calc(i,j) + cobalt%co3_sol_calc(i,j,k)*rho_dzt(i,j,k)
               cobalt%btm_co3_ion(i,j) = cobalt%btm_co3_ion(i,j) + cobalt%f_co3_ion(i,j,k)*rho_dzt(i,j,k)
             endif
           enddo
           ! Subtract off overshoot
           drho_dzt = rho_dzt_bot(i,j) - cobalt%Rho_0*cobalt%bottom_thickness
+          cobalt%btm_temp(i,j)=cobalt%btm_temp(i,j)-Temp(i,j,k_bot(i,j))*drho_dzt
           cobalt%btm_o2(i,j)=cobalt%btm_o2(i,j)-cobalt%f_o2(i,j,k_bot(i,j))*drho_dzt
           cobalt%btm_no3(i,j)=cobalt%btm_no3(i,j)-cobalt%f_no3(i,j,k_bot(i,j))*drho_dzt
+          cobalt%btm_alk(i,j)=cobalt%btm_alk(i,j)-cobalt%f_alk(i,j,k_bot(i,j))*drho_dzt
+          cobalt%btm_dic(i,j)=cobalt%btm_dic(i,j)-cobalt%f_dic(i,j,k_bot(i,j))*drho_dzt
           cobalt%btm_co3_sol_calc(i,j)=cobalt%btm_co3_sol_calc(i,j)-cobalt%co3_sol_calc(i,j,k_bot(i,j))*drho_dzt
           cobalt%btm_co3_ion(i,j)=cobalt%btm_co3_ion(i,j)-cobalt%f_co3_ion(i,j,k_bot(i,j))*drho_dzt
           ! convert back to moles kg-1
+          cobalt%btm_temp(i,j)=cobalt%btm_temp(i,j)/(cobalt%bottom_thickness*cobalt%Rho_0)
           cobalt%btm_o2(i,j)=cobalt%btm_o2(i,j)/(cobalt%bottom_thickness*cobalt%Rho_0)
           cobalt%btm_no3(i,j)=cobalt%btm_no3(i,j)/(cobalt%bottom_thickness*cobalt%Rho_0)
+          cobalt%btm_alk(i,j)=cobalt%btm_alk(i,j)/(cobalt%bottom_thickness*cobalt%Rho_0)
+          cobalt%btm_dic(i,j)=cobalt%btm_dic(i,j)/(cobalt%bottom_thickness*cobalt%Rho_0)
           cobalt%btm_co3_sol_calc(i,j)=cobalt%btm_co3_sol_calc(i,j)/(cobalt%bottom_thickness*cobalt%Rho_0)
           cobalt%btm_co3_ion(i,j)=cobalt%btm_co3_ion(i,j)/(cobalt%bottom_thickness*cobalt%Rho_0)
           ! calculate the saturation state with respect to calcite for subsequent calculations
           cobalt%btm_omega_calc(i,j)=cobalt%btm_co3_ion(i,j)/cobalt%btm_co3_sol_calc(i,j)
+          
+       endif
+    enddo; enddo  !} i, j
+
+
+   ! Calculate the processing of organic matter in the sediment.  The fate of organic matter is partitioned
+   ! between burial (i.e., removal from the system), aerobic remineralization, remineralization via
+   ! denitrification, and remineralization via sulfate reduction.  Note that the latter pathway is effectively
+   ! a "catch all" for any other anaerobic pathway and the sulfate cycle is not explicitly modeled.
+
+   if (do_CBED) then
+      !Note that CBED subroutine MUST set the '_btm' fluxes
+      call generic_CBED_update_from_source(tracer_list, cobalt, phyto, ilb, jlb, mask_coast, &
+           grid_tmask, grid_kmt, isc,iec, jsc,jec, isd,ied, jsd,jed, nk, r_dt, dt, tau, model_time, rho_dzt, dzt, internal_heat)
+    else
+      
+      do j = jsc, jec; do i = isc, iec  !{
+       if (grid_kmt(i,j) .gt. 0) then !{
 
           ! Calculate the processing of organic matter in the sediment.  The fate of organic matter is partitioned
           ! between burial (i.e., removal from the system), aerobic remineralization, remineralization via
@@ -5457,9 +5481,7 @@ contains
 
        endif !}
     enddo; enddo  !} i, j
-    deallocate(rho_dzt_bot)
-    deallocate(k_bot)
-
+    
     do k = 2, nk ; do j = jsc, jec ; do i = isc, iec   !{
        cobalt%f_cased(i,j,k) = 0.0
     enddo; enddo ; enddo  !} i,j,k
@@ -5474,6 +5496,9 @@ contains
     call g_tracer_set_values(tracer_list,'sio4', 'btf', cobalt%b_sio4,isd,jsd)
 !
     endif !do_CBED
+    deallocate(rho_dzt_bot)
+    deallocate(k_bot)
+
 
     call mpp_clock_end(id_clock_ballast_loops)
 
