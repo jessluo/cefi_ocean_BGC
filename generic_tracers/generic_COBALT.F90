@@ -5178,6 +5178,7 @@ contains
           ! and fluxes over a layer defined by "bottom_thickess".
           rho_dzt_bot(i,j) = 0.0
           cobalt%btm_temp(i,j) = 0.0
+          cobalt%btm_salt(i,j) = 0.0
           cobalt%btm_o2(i,j) = 0.0
           cobalt%btm_no3(i,j) = 0.0
           cobalt%btm_dic(i,j) = 0.0
@@ -5194,6 +5195,7 @@ contains
               k_bot(i,j) = k
               rho_dzt_bot(i,j) = rho_dzt_bot(i,j) + rho_dzt(i,j,k)
               cobalt%btm_temp(i,j) = cobalt%btm_temp(i,j) + Temp(i,j,k)*rho_dzt(i,j,k)
+              cobalt%btm_salt(i,j) = cobalt%btm_salt(i,j) + Salt(i,j,k)*rho_dzt(i,j,k)
               cobalt%btm_o2(i,j) = cobalt%btm_o2(i,j) + cobalt%f_o2(i,j,k)*rho_dzt(i,j,k)
               cobalt%btm_no3(i,j) = cobalt%btm_no3(i,j) + cobalt%f_no3(i,j,k)*rho_dzt(i,j,k)
               cobalt%btm_alk(i,j) = cobalt%btm_alk(i,j) + cobalt%f_alk(i,j,k)*rho_dzt(i,j,k)
@@ -5205,6 +5207,7 @@ contains
           ! Subtract off overshoot
           drho_dzt = rho_dzt_bot(i,j) - cobalt%Rho_0*cobalt%bottom_thickness
           cobalt%btm_temp(i,j)=cobalt%btm_temp(i,j)-Temp(i,j,k_bot(i,j))*drho_dzt
+          cobalt%btm_salt(i,j)=cobalt%btm_salt(i,j)-Salt(i,j,k_bot(i,j))*drho_dzt
           cobalt%btm_o2(i,j)=cobalt%btm_o2(i,j)-cobalt%f_o2(i,j,k_bot(i,j))*drho_dzt
           cobalt%btm_no3(i,j)=cobalt%btm_no3(i,j)-cobalt%f_no3(i,j,k_bot(i,j))*drho_dzt
           cobalt%btm_alk(i,j)=cobalt%btm_alk(i,j)-cobalt%f_alk(i,j,k_bot(i,j))*drho_dzt
@@ -5213,6 +5216,7 @@ contains
           cobalt%btm_co3_ion(i,j)=cobalt%btm_co3_ion(i,j)-cobalt%f_co3_ion(i,j,k_bot(i,j))*drho_dzt
           ! convert back to moles kg-1
           cobalt%btm_temp(i,j)=cobalt%btm_temp(i,j)/(cobalt%bottom_thickness*cobalt%Rho_0)
+          cobalt%btm_salt(i,j)=cobalt%btm_salt(i,j)/(cobalt%bottom_thickness*cobalt%Rho_0)
           cobalt%btm_o2(i,j)=cobalt%btm_o2(i,j)/(cobalt%bottom_thickness*cobalt%Rho_0)
           cobalt%btm_no3(i,j)=cobalt%btm_no3(i,j)/(cobalt%bottom_thickness*cobalt%Rho_0)
           cobalt%btm_alk(i,j)=cobalt%btm_alk(i,j)/(cobalt%bottom_thickness*cobalt%Rho_0)
@@ -7980,6 +7984,7 @@ contains
    allocate(cobalt%ffetot_100(isd:ied,jsd:jed))            ; cobalt%ffetot_100 = 0.0
 
    allocate(cobalt%btm_temp(isd:ied,jsd:jed))              ; cobalt%btm_temp = 0.0
+   allocate(cobalt%btm_salt(isd:ied,jsd:jed))              ; cobalt%btm_salt = 0.0
    allocate(cobalt%btm_o2(isd:ied,jsd:jed))                ; cobalt%btm_o2 = 0.0
    allocate(cobalt%btm_no3(isd:ied,jsd:jed))               ; cobalt%btm_no3 = 0.0
    allocate(cobalt%btm_alk(isd:ied,jsd:jed))               ; cobalt%btm_alk = 0.0
@@ -8475,6 +8480,7 @@ contains
     deallocate(cobalt%ffedet_100)
     deallocate(cobalt%flithdet_100)
     deallocate(cobalt%btm_temp)
+    deallocate(cobalt%btm_salt)
     deallocate(cobalt%fntot_100)
     deallocate(cobalt%fptot_100)
     deallocate(cobalt%ffetot_100)

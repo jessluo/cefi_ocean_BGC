@@ -303,6 +303,7 @@ module COBALT_send_diag
           do j = jsc, jec ; do i = isc, iec  !{
             rho_dzt_bot(i,j) = 0.0
             cobalt%btm_temp(i,j) = 0.0
+            cobalt%btm_salt(i,j) = 0.0
             cobalt%btm_o2(i,j) = 0.0
             cobalt%btm_dic(i,j) = 0.0
             cobalt%btm_alk(i,j) = 0.0
@@ -326,6 +327,7 @@ module COBALT_send_diag
                   cobalt%btm_alk(i,j) = cobalt%btm_alk(i,j) + cobalt%p_alk(i,j,k,tau)*rho_dzt(i,j,k)
                   cobalt%btm_dic(i,j) = cobalt%btm_dic(i,j) + cobalt%p_dic(i,j,k,tau)*rho_dzt(i,j,k)
                   cobalt%btm_temp(i,j) = cobalt%btm_temp(i,j) + Temp(i,j,k)*rho_dzt(i,j,k)
+                  cobalt%btm_salt(i,j) = cobalt%btm_salt(i,j) + Salt(i,j,k)*rho_dzt(i,j,k)
                   cobalt%btm_htotal(i,j) = cobalt%btm_htotal(i,j) + cobalt%f_htotal(i,j,k)*rho_dzt(i,j,k)
                   cobalt%btm_co3_sol_arag(i,j) = cobalt%btm_co3_sol_arag(i,j) + &
                     cobalt%co3_sol_arag(i,j,k)*rho_dzt(i,j,k)
@@ -339,6 +341,7 @@ module COBALT_send_diag
               ! calculate overshoot and subtract off
               drho_dzt = rho_dzt_bot(i,j) - cobalt%Rho_0*cobalt%bottom_thickness
               cobalt%btm_temp(i,j)=cobalt%btm_temp(i,j)-Temp(i,j,k_bot(i,j))*drho_dzt
+              cobalt%btm_salt(i,j)=cobalt%btm_salt(i,j)-Salt(i,j,k_bot(i,j))*drho_dzt
               cobalt%btm_o2(i,j)=cobalt%btm_o2(i,j)-cobalt%p_o2(i,j,k_bot(i,j),tau)*drho_dzt
               cobalt%btm_alk(i,j)=cobalt%btm_alk(i,j)-cobalt%p_alk(i,j,k_bot(i,j),tau)*drho_dzt
               cobalt%btm_dic(i,j)=cobalt%btm_dic(i,j)-cobalt%p_dic(i,j,k_bot(i,j),tau)*drho_dzt
@@ -348,6 +351,7 @@ module COBALT_send_diag
               cobalt%btm_co3_ion(i,j)=cobalt%btm_co3_ion(i,j)-cobalt%f_co3_ion(i,j,k_bot(i,j))*drho_dzt
               ! convert back to moles kg-1
               cobalt%btm_temp(i,j)=cobalt%btm_temp(i,j)/(cobalt%bottom_thickness*cobalt%Rho_0)
+              cobalt%btm_salt(i,j)=cobalt%btm_salt(i,j)/(cobalt%bottom_thickness*cobalt%Rho_0)
               cobalt%btm_o2(i,j)=cobalt%btm_o2(i,j)/(cobalt%bottom_thickness*cobalt%Rho_0)
               cobalt%btm_alk(i,j)=cobalt%btm_alk(i,j)/(cobalt%bottom_thickness*cobalt%Rho_0)
               cobalt%btm_dic(i,j)=cobalt%btm_dic(i,j)/(cobalt%bottom_thickness*cobalt%Rho_0)
@@ -365,6 +369,8 @@ module COBALT_send_diag
 
           ! CALCULATE BOTTOM PROGNOSTIC TRACERS
           used = g_send_data(cobalt%id_btm_temp, cobalt%btm_temp, &
+            model_time, rmask = grid_tmask(:,:,1), is_in=isc, js_in=jsc,ie_in=iec, je_in=jec)
+          used = g_send_data(cobalt%id_btm_salt, cobalt%btm_salt, &
             model_time, rmask = grid_tmask(:,:,1), is_in=isc, js_in=jsc,ie_in=iec, je_in=jec)
           used = g_send_data(cobalt%id_btm_o2, cobalt%btm_o2, &
             model_time, rmask = grid_tmask(:,:,1), is_in=isc, js_in=jsc,ie_in=iec, je_in=jec)

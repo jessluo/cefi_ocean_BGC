@@ -273,6 +273,23 @@ contains
       r = r_mid
    end function find_r
 
+
+! Function to calculate seawater calcium (Ca2+) conc. from salinity. mol/m3
+   function fn_sw_ca2(salinity, sw_density) result(dissolved_calcium)
+      real, intent(in) :: salinity, sw_density
+      real :: dissolved_calcium
+      real :: ca_at_35, salinity_ref, ca_ratio
+
+      ! Standard value: ~10.28 mmol/kg at Salinity 35
+      ca_at_35 = 10.28 * 1e-3 * sw_density
+      salinity_ref = 35.0
+      ! Calculate the ratio
+      ca_ratio = ca_at_35 / salinity_ref
+      ! Calculate calcium concentration for the given salinity
+      dissolved_calcium = salinity * ca_ratio  !unit: mol/m3
+   end function fn_sw_ca2
+
+
    subroutine generic_CBED_init(isc,iec,jsc,jec,isd,ied,jsd,jed,nk)
       integer,     intent(in) :: isc,iec,jsc,jec,isd,ied,jsd,jed,nk
       !Locals
@@ -1019,7 +1036,7 @@ contains
                else if (trim(field_name) == "f_talk") then
                   btm_tracer_conc = max(0.0, cobalt%btm_alk(i,j) * cobalt%Rho_0)
                else if (trim(field_name) == "f_ca2") then
-                  btm_tracer_conc = 0.0
+                  btm_tracer_conc = max(0.0, fn_sw_ca2(cobalt%btm_salt(i,j), cobalt%Rho_0))
                else if (trim(field_name) == "f_po4") then
                   btm_tracer_conc = max(0.0, cobalt%f_po4(i,j,nk) * cobalt%Rho_0)
                endif

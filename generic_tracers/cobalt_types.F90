@@ -876,6 +876,7 @@ module cobalt_types
           fsitot_100, &
           ffetot_100, &
           btm_temp,     &
+          btm_salt,     &
           btm_o2,       &
           btm_no3,      &
           btm_alk,       &
@@ -1196,6 +1197,7 @@ module cobalt_types
           id_sfc_irr_aclm   = -1,       &
           id_sfc_temp      = -1,       &
           id_btm_temp      = -1,       &
+          id_btm_salt      = -1,       &
           id_btm_o2        = -1,       &
           id_btm_no3       = -1,       &
           id_btm_alk       = -1,       &
