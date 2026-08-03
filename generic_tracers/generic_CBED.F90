@@ -54,13 +54,17 @@ module generic_CBED
       ! Diagnostics
       ! 3D diags
       real, dimension(:,:,:), allocatable :: TOC              ! total organic carbon (wt %) in sediment
+      real, dimension(:,:,:), allocatable :: TIC              ! total inorganic carbon (wt %) in sediment
       real, dimension(:,:,:), allocatable :: R_om_o2          ! OM resep via aerobic process
       real, dimension(:,:,:), allocatable :: R_om_no3         ! OM resep via denitrification
       real, dimension(:,:,:), allocatable :: R_om_anaerobic   ! OM resep via other anaerobic process
       real, dimension(:,:,:), allocatable :: R_dic            ! total remineralization
       real, dimension(:,:,:), allocatable :: R_nox            ! nitrification rate
-      real, dimension(:,:,:), allocatable :: R_anammox          ! anammox rate
+      real, dimension(:,:,:), allocatable :: R_anammox        ! anammox rate
       real, dimension(:,:,:), allocatable :: R_oduox          ! ODU reoxidation rate
+      real, dimension(:,:,:), allocatable :: R_talk_org       ! TA organic
+      real, dimension(:,:,:), allocatable :: R_talk_inorg     ! TA inorganic
+      real, dimension(:,:,:), allocatable :: R_talk           ! total TA = TA org + TA inorg
       real, dimension(:,:,:), allocatable :: cbed_bioirri
 
       ! 2D diags
@@ -121,6 +125,7 @@ module generic_CBED
       integer :: id_po4
       ! 3D diags
       integer :: id_TOC
+      integer :: id_TIC
       integer :: id_R_om_o2
       integer :: id_R_om_no3
       integer :: id_R_om_anaerobic
@@ -128,6 +133,9 @@ module generic_CBED
       integer :: id_R_nox
       integer :: id_R_anammox
       integer :: id_R_oduox
+      integer :: id_R_talk_org
+      integer :: id_R_talk_inorg
+      integer :: id_R_talk
       integer :: id_cbed_bioirri
 
       ! 2D diags
@@ -299,6 +307,7 @@ contains
       !Diagnostics
       ! 3D diags
       allocate(cbed%TOC(isd:ied,jsd:jed,nk_cbed));cbed%TOC=0.0
+      allocate(cbed%TIC(isd:ied,jsd:jed,nk_cbed));cbed%TIC=0.0
       allocate(cbed%R_om_o2(isd:ied,jsd:jed,nk_cbed));cbed%R_om_o2=0.0
       allocate(cbed%R_om_no3(isd:ied,jsd:jed,nk_cbed));cbed%R_om_no3=0.0
       allocate(cbed%R_om_anaerobic(isd:ied,jsd:jed,nk_cbed));cbed%R_om_anaerobic=0.0
@@ -306,6 +315,9 @@ contains
       allocate(cbed%R_nox(isd:ied,jsd:jed,nk_cbed));cbed%R_nox=0.0
       allocate(cbed%R_anammox(isd:ied,jsd:jed,nk_cbed));cbed%R_anammox=0.0
       allocate(cbed%R_oduox(isd:ied,jsd:jed,nk_cbed));cbed%R_oduox=0.0
+      allocate(cbed%R_talk_org(isd:ied,jsd:jed,nk_cbed));cbed%R_talk_org=0.0
+      allocate(cbed%R_talk_inorg(isd:ied,jsd:jed,nk_cbed));cbed%R_talk_inorg=0.0
+      allocate(cbed%R_talk(isd:ied,jsd:jed,nk_cbed));cbed%R_talk=0.0
       allocate(cbed%cbed_bioirri(isd:ied,jsd:jed,nk_cbed));cbed%cbed_bioirri=0.0
       ! 2D diags
       allocate(cbed%o2_flux(isd:ied,jsd:jed)); cbed%o2_flux=0.0
@@ -517,6 +529,8 @@ contains
       ! 3D diags
       cbed%id_TOC = register_diag_field(package_name, 'cbed_TOC', (/axes(1),axes(2),id_layer/), init_time,&
          'Total Organic Carbon in sediment', 'wt %', missing_value = missing_value1)
+      cbed%id_TIC = register_diag_field(package_name, 'cbed_TIC', (/axes(1),axes(2),id_layer/), init_time,&
+         'Total Inorganic Carbon in sediment', 'wt %', missing_value = missing_value1)
       cbed%id_R_om_o2 = register_diag_field(package_name, 'cbed_R_om_o2', (/axes(1),axes(2),id_layer/), init_time,&
          'aerobic respiration in sediment 3D field', 'mol C m-3 s-1', missing_value = missing_value1)
       cbed%id_R_om_no3 = register_diag_field(package_name, 'cbed_R_om_no3', (/axes(1),axes(2),id_layer/), init_time,&
@@ -531,6 +545,12 @@ contains
          'anammox in sediment', 'mol N2 m-3 s-1', missing_value = missing_value1)
       cbed%id_R_oduox = register_diag_field(package_name, 'cbed_R_oduox', (/axes(1),axes(2),id_layer/), init_time,&
          'ODU reoxidation in sediment', 'mol m-3 s-1', missing_value = missing_value1)
+      cbed%id_R_talk_org = register_diag_field(package_name, 'cbed_R_talk_org', (/axes(1),axes(2),id_layer/), init_time,&
+         'net organic TA prod', 'mol m-3 s-1', missing_value = missing_value1)
+      cbed%id_R_talk_inorg = register_diag_field(package_name, 'cbed_R_talk_inorg', (/axes(1),axes(2),id_layer/), init_time,&
+         'net inorganic TA prod', 'mol m-3 s-1', missing_value = missing_value1)
+      cbed%id_R_talk = register_diag_field(package_name, 'cbed_R_talk', (/axes(1),axes(2),id_layer/), init_time,&
+         'net TA prod, org+inorg', 'mol m-3 s-1', missing_value = missing_value1)
       cbed%id_cbed_bioirri = register_diag_field(package_name, 'cbed_bioirri', (/axes(1),axes(2),id_layer/), init_time,&
          'bioirrigation coefficient', 's-1', missing_value = missing_value1)
 
@@ -658,6 +678,8 @@ contains
       ! 3D diags
       used = send_data(cbed%id_TOC, cbed%TOC, model_time, rmask = cbed_tmask,&
          is_in=isc, js_in=jsc,ie_in=iec, je_in=jec, ks_in=1, ke_in=nk_cbed)
+      used = send_data(cbed%id_TIC, cbed%TIC, model_time, rmask = cbed_tmask,&
+         is_in=isc, js_in=jsc,ie_in=iec, je_in=jec, ks_in=1, ke_in=nk_cbed)
       used = send_data(cbed%id_R_om_o2, cbed%R_om_o2, model_time, rmask = cbed_tmask,&
          is_in=isc, js_in=jsc,ie_in=iec, je_in=jec, ks_in=1, ke_in=nk_cbed)
       used = send_data(cbed%id_R_om_no3, cbed%R_om_no3, model_time, rmask = cbed_tmask,&
@@ -671,6 +693,12 @@ contains
       used = send_data(cbed%id_R_anammox, cbed%R_anammox, model_time, rmask = cbed_tmask,&
          is_in=isc, js_in=jsc,ie_in=iec, je_in=jec, ks_in=1, ke_in=nk_cbed)
       used = send_data(cbed%id_R_oduox, cbed%R_oduox, model_time, rmask = cbed_tmask,&
+         is_in=isc, js_in=jsc,ie_in=iec, je_in=jec, ks_in=1, ke_in=nk_cbed)
+      used = send_data(cbed%id_R_talk_org, cbed%R_talk_org, model_time, rmask = cbed_tmask,&
+         is_in=isc, js_in=jsc,ie_in=iec, je_in=jec, ks_in=1, ke_in=nk_cbed)
+      used = send_data(cbed%id_R_talk_inorg, cbed%R_talk_inorg, model_time, rmask = cbed_tmask,&
+         is_in=isc, js_in=jsc,ie_in=iec, je_in=jec, ks_in=1, ke_in=nk_cbed)
+      used = send_data(cbed%id_R_talk, cbed%R_talk, model_time, rmask = cbed_tmask,&
          is_in=isc, js_in=jsc,ie_in=iec, je_in=jec, ks_in=1, ke_in=nk_cbed)
       used = send_data(cbed%id_cbed_bioirri, cbed%cbed_bioirri, model_time, rmask = cbed_tmask,&
          is_in=isc, js_in=jsc,ie_in=iec, je_in=jec, ks_in=1, ke_in=nk_cbed)
@@ -810,6 +838,7 @@ contains
       ! diags
       ! 3D diags
       deallocate(cbed%TOC)
+      deallocate(cbed%TIC)
       deallocate(cbed%R_om_o2)
       deallocate(cbed%R_om_no3)
       deallocate(cbed%R_om_anaerobic)
@@ -817,6 +846,9 @@ contains
       deallocate(cbed%R_nox)
       deallocate(cbed%R_anammox)
       deallocate(cbed%R_oduox)
+      deallocate(cbed%R_talk_org)
+      deallocate(cbed%R_talk_inorg)
+      deallocate(cbed%R_talk)
       deallocate(cbed%cbed_bioirri)
       !2D diags
       deallocate(cbed%o2_flux)
@@ -1144,10 +1176,10 @@ contains
       real, dimension(isc:iec,jsc:jec,nk_cbed) :: R_om1_anoxic, R_om2_anoxic, R_om3_anoxic
       real, dimension(isc:iec,jsc:jec,nk_cbed) :: R_dic_om1, R_dic_om2, R_dic_om3
       real, dimension(isc:iec,jsc:jec,nk_cbed) :: R_nox, R_ana, R_oduox, odu_depo
-      real, dimension(isc:iec,jsc:jec,nk_cbed) :: R_talk
+      real, dimension(isc:iec,jsc:jec,nk_cbed) :: R_talk_org, R_talk_inorg, R_talk
 
       ! local variables for positive concentration constraint and for calculating reaction rates based on that.
-      real, dimension(isc:iec,jsc:jec,nk_cbed) :: c_om1, c_om2, c_om3, c_o2, c_no3, c_nh4, c_dic, c_odu, c_talk, c_ca2, c_po4
+      real, dimension(isc:iec,jsc:jec,nk_cbed) :: c_om1, c_om2, c_om3, c_o2, c_no3, c_nh4, c_dic, c_odu, c_talk, c_calc, c_arag, c_ca2, c_po4
 
       ! b terms
       real, dimension(isc:iec,jsc:jec) :: b_o2, b_dic, b_nh4, b_no3, b_odu, b_alk, b_ca2, b_po4
@@ -1307,6 +1339,8 @@ contains
                   c_dic(i,j,k) = max(0.0, cbed%f_dic(i,j,k))
                   c_odu(i,j,k) = max(0.0, cbed%f_odu(i,j,k))
                   c_talk(i,j,k) = max(0.0, cbed%f_talk(i,j,k))
+                  c_calc(i,j,k) = max(0.0, cbed%f_calc(i,j,k))
+                  c_arag(i,j,k) = max(0.0, cbed%f_arag(i,j,k))
                   c_ca2(i,j,k) = max(0.0, cbed%f_ca2(i,j,k))
                   c_po4(i,j,k) = max(0.0, cbed%f_po4(i,j,k))
                enddo
@@ -1342,10 +1376,14 @@ contains
                   odu_depo(i,j,k) = (R_om1_anoxic(i,j,k)+R_om2_anoxic(i,j,k)+R_om3_anoxic(i,j,k))*min(1.0, 0.233*(w(i,j,k)*100.0*spery)**0.336)
 
                   ! TA calculation
-                  R_talk(i,j,k) = svf(i,j,k)/por(i,j,k)*(1.0/cobalt%c_2_n - p_2_c(i,j))*(R_om1_o2(i,j,k) + R_om2_o2(i,j,k) + R_om3_o2(i,j,k)) + &
+                  R_talk_org(i,j,k) = svf(i,j,k)/por(i,j,k)*(1.0/cobalt%c_2_n - p_2_c(i,j))*(R_om1_o2(i,j,k) + R_om2_o2(i,j,k) + R_om3_o2(i,j,k)) + &
                      svf(i,j,k)/por(i,j,k)*(0.8+1.0/cobalt%c_2_n - p_2_c(i,j))*(R_om1_no3(i,j,k) + R_om2_no3(i,j,k) + R_om3_no3(i,j,k)) + &
                      svf(i,j,k)/por(i,j,k)*(1.0+1.0/cobalt%c_2_n - p_2_c(i,j))*(R_om1_anoxic(i,j,k)+R_om2_anoxic(i,j,k)+R_om3_anoxic(i,j,k)) - &
                      2.0*R_nox(i,j,k) - 1.0*R_oduox(i,j,k) - 0.4*R_ana(i,j,k)
+
+                  R_talk_inorg(i,j,k) = 0.0
+
+                  R_talk(i,j,k) = R_talk_org(i,j,k) + R_talk_inorg(i,j,k)
 
                   ! calculations for diagnostics
                   cbed%R_om_o2(i,j,k) = R_om1_o2(i,j,k) + R_om2_o2(i,j,k) + R_om3_o2(i,j,k)
@@ -1355,6 +1393,9 @@ contains
                   cbed%R_nox(i,j,k) = R_nox(i,j,k)
                   cbed%R_anammox(i,j,k) = R_ana(i,j,k)
                   cbed%R_oduox(i,j,k) = R_oduox(i,j,k)
+                  cbed%R_talk_org(i,j,k) = R_talk_org(i,j,k)
+                  cbed%R_talk_inorg(i,j,k) = R_talk_inorg(i,j,k)
+                  cbed%R_talk(i,j,k) = R_talk(i,j,k)
 
                   cbed%cbed_bioirri(i,j,k) = bioirri(i,j,k) ! bioirrigation diagnostics
                enddo
@@ -1370,7 +1411,7 @@ contains
                   b_nh4(i,j) = cbed%cbed_b_nh4_acc(i,j)
                   b_no3(i,j) = cbed%cbed_b_no3_acc(i,j)
                   b_odu(i,j) = cbed%cbed_b_odu_acc(i,j)
-                  b_alk_org(i,j) = cbed%cbed_b_alk_org_acc(i,j)
+                  b_alk(i,j) = cbed%cbed_b_alk_acc(i,j)
 
                else
                   b_o2(i,j) = por(i,j,1)*D_o2(i,j,1)*((max(0.0,cobalt%btm_o2(i,j)*cobalt%Rho_0) - c_o2(i,j,1))/(dz_cbed(1)/2.0)) + &
@@ -1393,7 +1434,7 @@ contains
                      por(i,j,1)*w(i,j,1)*abs(min(0.0,cobalt%btm_o2(i,j)*cobalt%Rho_0)) + &
                      sum(dz_cbed(:)*por(i,j,1:nk_cbed)* bioirri(i,j,:)*(abs(min(0.0,cobalt%btm_o2(i,j)*cobalt%Rho_0)) - c_odu(i,j,:)) )
 
-                  b_alk_org(i,j) = sum(dz_cbed(:)*por(i,j,1:nk_cbed)*R_talk(i,j,:))
+                  b_alk(i,j) = sum(dz_cbed(:)*por(i,j,1:nk_cbed)*R_talk(i,j,:))
                endif
 
 
@@ -1413,10 +1454,11 @@ contains
 
 
                !-----------------
-               !TOC (total organic carbon) diagnostics
+               !TOC and TIC (total organic carbon, total inorganic (calc+arag) carbon) diagnostics
                !----------------
                do k = 1, nk_cbed
                   cbed%TOC(i,j,k)  = (c_om1(i,j,k)+c_om2(i,j,k)+c_om3(i,j,k))*12.0/1e6/rho_s*100.0
+                  cbed%TIC(i,j,k)  = (c_calc(i,j,k)+c_arag(i,j,k))*100.0/1e6/rho_s*100.0
                enddo
 
                !-----------------
@@ -1637,6 +1679,8 @@ contains
                         c_dic(i,j,k) = max(0.0, cbed%f_dic(i,j,k))
                         c_odu(i,j,k) = max(0.0, cbed%f_odu(i,j,k))
                         c_talk(i,j,k) = max(0.0, cbed%f_talk(i,j,k))
+                        c_calc(i,j,k) = max(0.0, cbed%f_calc(i,j,k))
+                        c_arag(i,j,k) = max(0.0, cbed%f_arag(i,j,k))
                         c_ca2(i,j,k) = max(0.0, cbed%f_ca2(i,j,k))
                         c_po4(i,j,k) = max(0.0, cbed%f_po4(i,j,k))
 
@@ -1667,10 +1711,14 @@ contains
                         odu_depo(i,j,k) = (R_om1_anoxic(i,j,k)+R_om2_anoxic(i,j,k)+R_om3_anoxic(i,j,k))*min(1.0, 0.233*(w(i,j,k)*100.0*spery)**0.336)
 
                         ! TA calculation
-                        R_talk(i,j,k) = svf(i,j,k)/por(i,j,k)*(1.0/cobalt%c_2_n - p_2_c(i,j))*(R_om1_o2(i,j,k) + R_om2_o2(i,j,k) + R_om3_o2(i,j,k)) + &
+                        R_talk_org(i,j,k) = svf(i,j,k)/por(i,j,k)*(1.0/cobalt%c_2_n - p_2_c(i,j))*(R_om1_o2(i,j,k) + R_om2_o2(i,j,k) + R_om3_o2(i,j,k)) + &
                            svf(i,j,k)/por(i,j,k)*(0.8+1.0/cobalt%c_2_n - p_2_c(i,j))*(R_om1_no3(i,j,k) + R_om2_no3(i,j,k) + R_om3_no3(i,j,k)) + &
                            svf(i,j,k)/por(i,j,k)*(1.0+1.0/cobalt%c_2_n - p_2_c(i,j))*(R_om1_anoxic(i,j,k)+R_om2_anoxic(i,j,k)+R_om3_anoxic(i,j,k)) - &
                            2.0*R_nox(i,j,k) - 1.0*R_oduox(i,j,k) - 0.4*R_ana(i,j,k)
+
+                        R_talk_inorg(i,j,k) = 0.0
+
+                        R_talk(i,j,k) = R_talk_org(i,j,k) + R_talk_inorg(i,j,k)
 
                      enddo !k
 
