@@ -15,6 +15,7 @@ module generic_CBED
    use fms_mod, only: error_mesg, NOTE, WARNING, FATAL
    use mpp_mod,           only: stdout
    use fms_mod,           only: stdout
+   use FMS_co2calc_mod, only : FMS_co2calc, CO2_dope_vector
    !use, intrinsic :: ieee_arithmetic ! for checking presence of NaN or inf
 
    implicit none; private
@@ -188,6 +189,8 @@ module generic_CBED
    end type generic_CBED_type
 
    type(generic_CBED_type) :: cbed
+
+   type(CO2_dope_vector) :: CO2_dope_vec_cbed
 
    real, parameter :: pi = acos(-1.0)
 
@@ -1238,6 +1241,8 @@ contains
       real :: n_diss_calc, n_diss_arag, n_prec_calc
       real :: k_diss_calc, k_diss_arag, k_prec_calc, k_prec_arag
       real, dimension(isc:iec,jsc:jec,nk_cbed) :: R_diss_calc, R_diss_arag, R_prec_calc, R_prec_arag
+      real, dimension(isc:iec,jsc:jec,nk_cbed) :: htotal_dummy 
+      real, dimension(isc:iec,jsc:jec,nk_cbed) :: c_h2s_co2, c_sio4_co2
 
 
 
@@ -1763,9 +1768,39 @@ contains
                         !------
                         ! 1) call co2calc. get omega. 2) determine n_diss, k_diss etc. 3) write R_diss, R_prec
 
+                        !Used in FMS_co2calc
+                        CO2_dope_vec_cbed%isc = i ; CO2_dope_vec_cbed%iec = i
+                        CO2_dope_vec_cbed%jsc = j ; CO2_dope_vec_cbed%jec = j
+                        CO2_dope_vec_cbed%isd = i ; CO2_dope_vec_cbed%ied = i
+                        CO2_dope_vec_cbed%jsd = j ; CO2_dope_vec_cbed%jed = j
+
+                        htotal_dummy(i,j,k) = cobalt%f_htotal(i,j,k)
+                        c_h2s_co2(i,j,k) = 0.5*c_odu(i,j,k)
+                        c_sio4_co2(i,j,k) = cobalt%f_sio4(i,j,nk) * cobalt%Rho_0
 
 
 
+                        call FMS_co2calc(CO2_dope_vec_cbed,grid_kmt(i,j),&
+                           cobalt%btm_temp(i,j), cobalt%btm_salt(i,j),                    &
+                           c_dic(i,j,k),                          &
+                           c_po4(i,j,k),                          &
+                           c_sio4_co2(i,j,k),                         &
+                           c_talk(i,j,k),                          &
+                           cobalt%htotallo(i,j), cobalt%htotalhi(i,j),&
+                        !InOut
+                           htotal_dummy(i,j,k),                       &
+                        !Optional In
+                           zt=cobalt%zt(i,j,nk),                          &
+                           nh4_in=c_nh4(i,j,k),                           &
+                           h2s_in=hs2_proxy(i,j,k),                       &
+                           ca_in=c_ca2(i,j,k),                            &
+                           optCON_in='mol/m3',                            &
+                        !OUT
+                           omega_arag=cbed%cbed_omega_arag(i,j,k), &
+                           omega_calc=cbed%cbed_omega_calc(i,j,k), &
+                           ph_out=cbed%cbed_ph(i,j,k))
+
+                           
 
                         !
                         !end carbonate system calculations
