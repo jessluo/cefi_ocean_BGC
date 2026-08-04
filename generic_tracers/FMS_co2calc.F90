@@ -159,7 +159,7 @@ end subroutine read_mocsy_namelist
 subroutine FMS_co2calc(dope_vec, mask,                      &
                           t_in, s_in, dic_in, pt_in, sit_in, ta_in, htotallo, &
                           htotalhi, htotal, zt, co2star, alpha, pCO2surf, &
-                          co3_ion, omega_arag, omega_calc, &
+                          co3_ion, omega_arag, omega_calc, ph_out, &
                           nh4_in, h2s_in, ca_in, optCON_in)  !{
 
 implicit none
@@ -170,6 +170,10 @@ implicit none
 
 real, parameter :: permeg = 1.e-6
 real, parameter :: xacc = 1.0e-10
+! Reference seawater density (kg/m3), used only to rescale the mol/kg-derived
+! max_species_value ceiling and the alkalinity-based salinity floor below for
+! optCON='mol/m3'. Not a physical density used anywhere else.
+real, parameter :: Rho_0 = 1035.
 
 ! Mocsy parameters
 real, dimension(1) :: ph, pco2, fco2, co2, hco3, co3,  &
@@ -206,7 +210,8 @@ real, dimension(dope_vec%isd:dope_vec%ied,dope_vec%jsd:dope_vec%jed), &
                                co2star, &
                                co3_ion, &
                                omega_arag, &
-                               omega_calc
+                               omega_calc, &
+                               ph_out
 !
 !       local variables
 !
@@ -242,6 +247,7 @@ real :: tk100
 real :: tk1002
 real :: logf_of_s
 real :: salinity
+real :: conc_scale
 
 !character(len=10) :: co2_calc_method
 
@@ -270,6 +276,11 @@ real :: salinity
   optCON = 'mol/kg'
   if (present(optCON_in)) optCON = optCON_in
 
+  ! The max_species_value/salinity-floor factors are all
+  ! mol/kg-derived; rescale them by Rho_0 when optCON='mol/m3'.
+  conc_scale = 1.0
+  if (trim(optCON) == 'mol/m3') conc_scale = Rho_0
+
   do j = jsc, jec  !{
     do i = isc, iec  !{
       if (mask(i,j) .gt. 0.0) then  !{
@@ -292,7 +303,7 @@ real :: salinity
         ! Floor for low salinity waters based on alkalinity
         ! Molecular weight of sodium bicarbonate = 84.
         if (sal_floor_based_on_alk) then
-          salinity = max(s_in(i,j),ta_in(i,j)*84.)   ! yields concentration in g/kg (per mil)
+          salinity = max(s_in(i,j),(ta_in(i,j)/conc_scale)*84.)   ! yields concentration in g/kg (per mil)
         endif
 
         ! Assign Mocsy inputs
@@ -321,18 +332,19 @@ real :: salinity
         endif
 
         if (apply_epsln_floor) then
+          ! epsln is intentionally left unscaled by conc_scale
           sal(1)   = max(sal(1),epsln)  ! psu
-          alk(1)   = max(alk(1),epsln)  ! mol/kg
-          dic(1)   = max(dic(1),epsln)  ! mol/kg
-          sil(1)   = max(sil(1),epsln)  ! mol/kg
-          phos(1)  = max(phos(1),epsln) ! mol/kg
+          alk(1)   = max(alk(1),epsln)  ! mol/kg or mol/m3, per optCON
+          dic(1)   = max(dic(1),epsln)  ! mol/kg or mol/m3, per optCON
+          sil(1)   = max(sil(1),epsln)  ! mol/kg or mol/m3, per optCON
+          phos(1)  = max(phos(1),epsln) ! mol/kg or mol/m3, per optCON
         endif
 
         if (apply_species_ceiling) then
-          alk(1)   = min(alk(1),max_species_value)  ! mol/kg
-          dic(1)   = min(dic(1),max_species_value)  ! mol/kg
-          sil(1)   = min(sil(1),max_species_value)  ! mol/kg
-          phos(1)  = min(phos(1),max_species_value) ! mol/kg
+          alk(1)   = min(alk(1),max_species_value*conc_scale)  ! mol/kg or mol/m3, per optCON
+          dic(1)   = min(dic(1),max_species_value*conc_scale)  ! mol/kg or mol/m3, per optCON
+          sil(1)   = min(sil(1),max_species_value*conc_scale)  ! mol/kg or mol/m3, per optCON
+          phos(1)  = min(phos(1),max_species_value*conc_scale) ! mol/kg or mol/m3, per optCON
         endif
 
         if (apply_salinity_ceiling) then
@@ -354,6 +366,7 @@ real :: salinity
         if (present(pCO2surf))  pCO2surf(i,j)  = pco2(1)
         if (present(omega_arag)) omega_arag(i,j) = OmegaA(1)
         if (present(omega_calc)) omega_calc(i,j) = OmegaC(1)
+        if (present(ph_out))     ph_out(i,j)     = ph(1)
 
       else  !}{mask(i,j)=0.0
 
