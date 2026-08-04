@@ -159,8 +159,7 @@ end subroutine read_mocsy_namelist
 subroutine FMS_co2calc(dope_vec, mask,                      &
                           t_in, s_in, dic_in, pt_in, sit_in, ta_in, htotallo, &
                           htotalhi, htotal, zt, co2star, alpha, pCO2surf, &
-                          co3_ion, omega_arag, omega_calc, ph_out &
-                          nh4_in, h2s_in, ca_in, optCON_in)  !{
+                          co3_ion, omega_arag, omega_calc)  !{
 
 implicit none
 
@@ -175,7 +174,6 @@ real, parameter :: xacc = 1.0e-10
 real, dimension(1) :: ph, pco2, fco2, co2, hco3, co3,  &
                       OmegaA, OmegaC, BetaD, rhoSW, p, depth, tempis
 real, dimension(1) :: temp, sal, alk, dic, sil, phos, Patm, lat
-real, dimension(1) :: nh4, h2s, ca
 character(10)      :: optCON, optGas, optT, optP, optB, optKf, optK1K2
 
 !
@@ -195,19 +193,14 @@ real, dimension(dope_vec%isd:dope_vec%ied,dope_vec%jsd:dope_vec%jed), &
 real, dimension(dope_vec%isd:dope_vec%ied,dope_vec%jsd:dope_vec%jed), &
       intent(inout)         :: htotal
 real, dimension(dope_vec%isd:dope_vec%ied,dope_vec%jsd:dope_vec%jed), &
-      intent(in), optional  :: zt, &
-                               nh4_in, &
-                               h2s_in, &
-                               ca_in
-character(len=*), intent(in), optional :: optCON_in
+      intent(in), optional  :: zt
 real, dimension(dope_vec%isd:dope_vec%ied,dope_vec%jsd:dope_vec%jed), &
       intent(out), optional :: alpha, &
                                pCO2surf, &
                                co2star, &
                                co3_ion, &
                                omega_arag, &
-                               omega_calc, &
-                               ph_out
+                               omega_calc
 !
 !       local variables
 !
@@ -268,9 +261,6 @@ real :: salinity
 !
   log100 = log(100.0)
 
-  optCON = 'mol/kg'
-  if (present(optCON_in)) optCON = optCON_in
-
   do j = jsc, jec  !{
     do i = isc, iec  !{
       if (mask(i,j) .gt. 0.0) then  !{
@@ -307,16 +297,6 @@ real :: salinity
         sil(1)   = sit_in(i,j) ! mol/kg
         phos(1)  = pt_in(i,j)  ! mol/kg
 
-        ! NH4/H2S/Ca2+ default to "no effect" when not supplied by the caller:
-        ! nh4=0, h2s=0 contribute nothing to alkalinity; ca<=0 falls back to
-        ! mocsy's salinity-based estimate.
-        nh4(1) = 0.
-        h2s(1) = 0.
-        ca(1)  = -1.
-        if (present(nh4_in)) nh4(1) = nh4_in(i,j)
-        if (present(h2s_in)) h2s(1) = h2s_in(i,j)
-        if (present(ca_in))  ca(1)  = ca_in(i,j)
-
         if (apply_temperature_floor) then
           temp(1)  = max(temp(1),minimum_temperature) ! degC
         endif
@@ -342,10 +322,9 @@ real :: salinity
 
         call vars(ph, pco2, fco2, co2, hco3, co3, OmegaA, OmegaC, BetaD, rhoSW, p, tempis, &
                  temp, sal, alk, dic, sil, phos, Patm, depth, lat, 1,                     &
-                 optCON=optCON, optT='Tpot   ', optP='m ', optb=boron_formulation,        &
+                 optCON='mol/kg', optT='Tpot   ', optP='m ', optb=boron_formulation,      &
                  optK1K2=dissociation_constants, optkf=hf_equilibrium_constant,           &
-                 optgas='Pinsitu',verbose=print_oor_warnings,                             &
-                 nh4=nh4, h2s=h2s, ca=ca)
+                 optgas='Pinsitu',verbose=print_oor_warnings)
 
         htotal(i,j) = 10.**(-1.*ph(1))
 
@@ -355,7 +334,6 @@ real :: salinity
         if (present(pCO2surf))  pCO2surf(i,j)  = pco2(1)
         if (present(omega_arag)) omega_arag(i,j) = OmegaA(1)
         if (present(omega_calc)) omega_calc(i,j) = OmegaC(1)
-        if (present(ph_out))     ph_out(i,j)     = ph(1)
 
       else  !}{mask(i,j)=0.0
 
