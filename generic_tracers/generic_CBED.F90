@@ -15,7 +15,7 @@ module generic_CBED
    use fms_mod, only: error_mesg, NOTE, WARNING, FATAL
    use mpp_mod,           only: stdout
    use fms_mod,           only: stdout
-   use FMS_co2calc_mod, only : FMS_co2calc, CO2_dope_vector
+   !use FMS_co2calc_mod, only : FMS_co2calc, CO2_dope_vector
    !use, intrinsic :: ieee_arithmetic ! for checking presence of NaN or inf
 
    implicit none; private
@@ -67,9 +67,9 @@ module generic_CBED
       real, dimension(:,:,:), allocatable :: R_talk_inorg     ! TA inorganic
       real, dimension(:,:,:), allocatable :: R_talk           ! total TA = TA org + TA inorg
       real, dimension(:,:,:), allocatable :: cbed_bioirri
-      real, dimension(:,:,:), allocatable :: cbed_omega_calc
-      real, dimension(:,:,:), allocatable :: cbed_omega_arag
-      real, dimension(:,:,:), allocatable :: cbed_ph
+      ! real, dimension(:,:,:), allocatable :: cbed_omega_calc
+      ! real, dimension(:,:,:), allocatable :: cbed_omega_arag
+      ! real, dimension(:,:,:), allocatable :: cbed_ph
 
       ! 2D diags
       real, dimension(:,:), allocatable :: o2_flux !benthic o2 flux
@@ -141,9 +141,9 @@ module generic_CBED
       integer :: id_R_talk_inorg
       integer :: id_R_talk
       integer :: id_cbed_bioirri
-      integer :: id_cbed_omega_calc
-      integer :: id_cbed_omega_arag
-      integer :: id_cbed_ph
+      ! integer :: id_cbed_omega_calc
+      ! integer :: id_cbed_omega_arag
+      ! integer :: id_cbed_ph
 
       ! 2D diags
       integer :: id_o2_flux
@@ -190,7 +190,7 @@ module generic_CBED
 
    type(generic_CBED_type) :: cbed
 
-   type(CO2_dope_vector) :: CO2_dope_vec_cbed
+   !type(CO2_dope_vector) :: CO2_dope_vec_cbed
 
    real, parameter :: pi = acos(-1.0)
 
@@ -345,9 +345,9 @@ contains
       allocate(cbed%R_talk_inorg(isd:ied,jsd:jed,nk_cbed));cbed%R_talk_inorg=0.0
       allocate(cbed%R_talk(isd:ied,jsd:jed,nk_cbed));cbed%R_talk=0.0
       allocate(cbed%cbed_bioirri(isd:ied,jsd:jed,nk_cbed));cbed%cbed_bioirri=0.0
-      allocate(cbed%cbed_omega_calc(isd:ied,jsd:jed,nk_cbed));cbed%cbed_omega_calc=0.0
-      allocate(cbed%cbed_omega_arag(isd:ied,jsd:jed,nk_cbed));cbed%cbed_omega_arag=0.0
-      allocate(cbed%cbed_ph(isd:ied,jsd:jed,nk_cbed));cbed%cbed_ph=0.0
+      ! allocate(cbed%cbed_omega_calc(isd:ied,jsd:jed,nk_cbed));cbed%cbed_omega_calc=0.0
+      ! allocate(cbed%cbed_omega_arag(isd:ied,jsd:jed,nk_cbed));cbed%cbed_omega_arag=0.0
+      ! allocate(cbed%cbed_ph(isd:ied,jsd:jed,nk_cbed));cbed%cbed_ph=0.0
       ! 2D diags
       allocate(cbed%o2_flux(isd:ied,jsd:jed)); cbed%o2_flux=0.0
       allocate(cbed%nh4_flux(isd:ied,jsd:jed)); cbed%nh4_flux=0.0
@@ -582,12 +582,12 @@ contains
          'net TA prod, org+inorg', 'mol m-3 s-1', missing_value = missing_value1)
       cbed%id_cbed_bioirri = register_diag_field(package_name, 'cbed_bioirri', (/axes(1),axes(2),id_layer/), init_time,&
          'bioirrigation coefficient', 's-1', missing_value = missing_value1)
-      cbed%id_cbed_omega_calc = register_diag_field(package_name, 'cbed_omega_calc', (/axes(1),axes(2),id_layer/), init_time,&
-         'cbed omega calcite', 'mol/kg', missing_value = missing_value1)
-      cbed%id_cbed_omega_arag = register_diag_field(package_name, 'cbed_omega_arag', (/axes(1),axes(2),id_layer/), init_time,&
-         'cbed omega aragonite', 'mol/kg', missing_value = missing_value1)
-      cbed%id_cbed_ph = register_diag_field(package_name, 'cbed_ph', (/axes(1),axes(2),id_layer/), init_time,&
-         'sediment pH', 'total scale', missing_value = missing_value1)
+      ! cbed%id_cbed_omega_calc = register_diag_field(package_name, 'cbed_omega_calc', (/axes(1),axes(2),id_layer/), init_time,&
+      !    'cbed omega calcite', 'mol/kg', missing_value = missing_value1)
+      ! cbed%id_cbed_omega_arag = register_diag_field(package_name, 'cbed_omega_arag', (/axes(1),axes(2),id_layer/), init_time,&
+      !    'cbed omega aragonite', 'mol/kg', missing_value = missing_value1)
+      ! cbed%id_cbed_ph = register_diag_field(package_name, 'cbed_ph', (/axes(1),axes(2),id_layer/), init_time,&
+      !    'sediment pH', 'total scale', missing_value = missing_value1)
 
       ! 2D diags
       cbed%id_o2_flux = register_diag_field(package_name, 'cbed_o2_flux', (/axes(1),axes(2)/), init_time,&
@@ -737,12 +737,12 @@ contains
          is_in=isc, js_in=jsc,ie_in=iec, je_in=jec, ks_in=1, ke_in=nk_cbed)
       used = send_data(cbed%id_cbed_bioirri, cbed%cbed_bioirri, model_time, rmask = cbed_tmask,&
          is_in=isc, js_in=jsc,ie_in=iec, je_in=jec, ks_in=1, ke_in=nk_cbed)
-      used = send_data(cbed%id_cbed_omega_calc, cbed%cbed_omega_calc, model_time, rmask = cbed_tmask,&
-         is_in=isc, js_in=jsc,ie_in=iec, je_in=jec, ks_in=1, ke_in=nk_cbed)
-      used = send_data(cbed%id_cbed_omega_arag, cbed%cbed_omega_arag, model_time, rmask = cbed_tmask,&
-         is_in=isc, js_in=jsc,ie_in=iec, je_in=jec, ks_in=1, ke_in=nk_cbed)
-      used = send_data(cbed%id_cbed_ph, cbed%cbed_ph, model_time, rmask = cbed_tmask,&
-         is_in=isc, js_in=jsc,ie_in=iec, je_in=jec, ks_in=1, ke_in=nk_cbed)
+      ! used = send_data(cbed%id_cbed_omega_calc, cbed%cbed_omega_calc, model_time, rmask = cbed_tmask,&
+      !    is_in=isc, js_in=jsc,ie_in=iec, je_in=jec, ks_in=1, ke_in=nk_cbed)
+      ! used = send_data(cbed%id_cbed_omega_arag, cbed%cbed_omega_arag, model_time, rmask = cbed_tmask,&
+      !    is_in=isc, js_in=jsc,ie_in=iec, je_in=jec, ks_in=1, ke_in=nk_cbed)
+      ! used = send_data(cbed%id_cbed_ph, cbed%cbed_ph, model_time, rmask = cbed_tmask,&
+      !    is_in=isc, js_in=jsc,ie_in=iec, je_in=jec, ks_in=1, ke_in=nk_cbed)
       ! 2D diags
       used = send_data(cbed%id_o2_flux, cbed%o2_flux, model_time, rmask = cbed_tmask(:,:,1),&
          is_in=isc, js_in=jsc,ie_in=iec, je_in=jec)
@@ -891,9 +891,9 @@ contains
       deallocate(cbed%R_talk_inorg)
       deallocate(cbed%R_talk)
       deallocate(cbed%cbed_bioirri)
-      deallocate(cbed%cbed_omega_calc)
-      deallocate(cbed%cbed_omega_arag)
-      deallocate(cbed%cbed_ph)
+      ! deallocate(cbed%cbed_omega_calc)
+      ! deallocate(cbed%cbed_omega_arag)
+      ! deallocate(cbed%cbed_ph)
       !2D diags
       deallocate(cbed%o2_flux)
       deallocate(cbed%nh4_flux)
@@ -1237,12 +1237,12 @@ contains
       integer, dimension(isc:iec,jsc:jec) :: n_sub
       real, dimension(isc:iec,jsc:jec) :: dt_sub
 
-      ! carbonate system related variables
-      real :: n_diss_calc, n_diss_arag, n_prec_calc
-      real :: k_diss_calc, k_diss_arag, k_prec_calc, k_prec_arag
-      real, dimension(isc:iec,jsc:jec,nk_cbed) :: R_diss_calc, R_diss_arag, R_prec_calc, R_prec_arag
-      real, dimension(isc:iec,jsc:jec,nk_cbed) :: htotal_dummy 
-      real, dimension(isc:iec,jsc:jec,nk_cbed) :: c_h2s_co2, c_sio4_co2
+      ! ! carbonate system related variables
+      ! real :: n_diss_calc, n_diss_arag, n_prec_calc
+      ! real :: k_diss_calc, k_diss_arag, k_prec_calc, k_prec_arag
+      ! real, dimension(isc:iec,jsc:jec,nk_cbed) :: R_diss_calc, R_diss_arag, R_prec_calc, R_prec_arag
+      ! real, dimension(isc:iec,jsc:jec,nk_cbed) :: htotal_dummy 
+      ! real, dimension(isc:iec,jsc:jec,nk_cbed) :: c_h2s_co2, c_sio4_co2
 
 
 
