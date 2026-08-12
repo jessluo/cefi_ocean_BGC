@@ -1,6 +1,6 @@
 [submodule "mocsy"]
 	path = mocsy
-	#url = https://github.com/jessluo/mocsy.git
-	#branch = add-calcium-override-gfdl
-	url = https://github.com/NOAA-GFDL/mocsy.git
-	branch = dev/gfdl
+	url = https://github.com/jessluo/mocsy.git
+	branch = add-calcium-override-gfdl
+	#url = https://github.com/NOAA-GFDL/mocsy.git
+	#branch = dev/gfdl
