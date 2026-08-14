@@ -51,7 +51,7 @@ implicit none
 private
 
 public  :: read_mocsy_namelist
-public  :: FMS_co2calc, CO2_dope_vector
+public  :: FMS_co2calc, FMS_co2calc_point, CO2_dope_vector
 
 character(len=128) :: version = '$Id$'
 character(len=128) :: tagname = '$Name$'
@@ -362,5 +362,216 @@ return
 end subroutine  FMS_co2calc  !}
 ! </SUBROUTINE> NAME="FMS_co2calc"
 
+
+!#######################################################################
+! <SUBROUTINE NAME="FMS_co2calc_point">
+!
+! <DESCRIPTION>
+!       Scalar (point-wise) version of FMS_co2calc. 
+!       Calculates co2* from total alkalinity and total CO2 at
+!       temperature (t) and salinity (s), via mocsy's vars() routine for 
+!       a single grid point. Designed to be called from inside nested 
+!       (i,j,k) spatial loops or adaptive time-stepping loops.
+!
+! INPUT (Scalars)
+!
+!       mask       = land mask (0.0 = land)
+!       t_in       = potential temperature (degC)
+!       s_in       = salinity (psu)
+!       dic_in     = total inorganic carbon (mol/kg)
+!       pt_in      = inorganic phosphate (mol/kg)
+!       sit_in     = inorganic silicate (mol/kg)
+!       ta_in      = total alkalinity (eq/kg)
+!       htotal     = H+ concentration (mol/kg) [in/out]
+!
+!  INPUT (optional scalars)
+!
+!       zt         = depth of the cell being solved (m).
+!       htotallo   = lower limit of htotal range (retained for interface compatibility)
+!       htotalhi   = upper limit of htotal range (retained for interface compatibility)
+!       nh4_in     = ammonium (mol/kg)
+!       h2s_in     = hydrogen sulfide (mol/kg)
+!       ca_in      = calcium (mol/kg)
+!       optCON_in  = concentration units (default 'mol/kg', or 'mol/m3')
+!
+! OUTPUT (optional scalars)
+!       co2star    = CO2*water, or H2CO3 concentration (mol/kg)
+!       alpha      = Solubility of CO2 for air (mol/kg/atm)
+!       pco2surf   = oceanic pCO2, in-situ at depth zt (uatm)
+!       co3_ion    = Carbonate ion, or CO3-- concentration (mol/kg)
+!       omega_arag = aragonite saturation state (dimensionless)
+!       omega_calc = calcite saturation state (dimensionless)
+!       ph_out     = pH on the total scale
+!
+! </DESCRIPTION>
+
+subroutine FMS_co2calc_point(mask, t_in, s_in, dic_in, pt_in, sit_in, ta_in, htotallo, &
+                             htotalhi, htotal, zt, co2star, alpha, pCO2surf, &
+                             co3_ion, omega_arag, omega_calc, ph_out, &
+                             nh4_in, h2s_in, ca_in, optCON_in)  !{
+
+implicit none
+
+!
+!       local parameters
+!
+
+! Reference seawater density (kg/m3), used only to rescale the mol/kg-derived
+! max_species_value ceiling and the alkalinity-based salinity floor below for
+! optCON='mol/m3'. Not a physical density used anywhere else.
+real, parameter :: Rho_0 = 1035.
+
+! Mocsy parameters (Mocsy expects arrays of size 1 even for scalar calculations)
+real, dimension(1) :: ph, pco2, fco2, co2, hco3, co3,  &
+                      OmegaA, OmegaC, BetaD, rhoSW, p, depth, tempis
+real, dimension(1) :: temp, sal, alk, dic, sil, phos, Patm, lat
+real, dimension(1) :: nh4, h2s, ca
+character(10)      :: optCON
+
+!
+!       arguments (Scalars instead of Arrays)
+!
+real, intent(in)            :: mask, &
+                               t_in, &
+                               s_in, &
+                               dic_in, &
+                               pt_in, &
+                               sit_in, &
+                               ta_in
+real, intent(inout)         :: htotal
+real, intent(in), optional  :: zt, &
+                               nh4_in, &
+                               h2s_in, &
+                               ca_in, &
+                               htotallo, &
+                               htotalhi
+character(len=*), intent(in), optional :: optCON_in
+real, intent(out), optional :: alpha, &
+                               pCO2surf, &
+                               co2star, &
+                               co3_ion, &
+                               omega_arag, &
+                               omega_calc, &
+                               ph_out
+!
+!       local variables
+!
+real :: salinity
+real :: conc_scale
+
+    if (.not. present(zt)) then
+        call mpp_error(FATAL,"Depth must be specified when invoking Mocsy.")
+    end if
+
+!
+!       Initialize the module
+!
+  optCON = 'mol/kg'
+  if (present(optCON_in)) optCON = optCON_in
+
+  ! The max_species_value/salinity-floor factors are all
+  ! mol/kg-derived; rescale them by Rho_0 when optCON='mol/m3'.
+  conc_scale = 1.0
+  if (trim(optCON) == 'mol/m3') conc_scale = Rho_0
+
+  if (mask .gt. 0.0) then  !{
+
+    ! Initialize Mocsy input arrays (size 1)
+    Patm  = 0. 
+    depth = 0. 
+    lat   = 0. 
+    temp  = 0. 
+    sal   = 0. 
+    alk   = 0. 
+    dic   = 0. 
+    sil   = 0. 
+    phos  = 0. 
+
+    ! Initialize salinity 
+    salinity = s_in
+
+    ! Floor for low salinity waters based on alkalinity
+    ! Molecular weight of sodium bicarbonate = 84.
+    if (sal_floor_based_on_alk) then
+      salinity = max(s_in,(ta_in/conc_scale)*84.)   ! yields concentration in g/kg (per mil)
+    endif
+
+    ! Assign Mocsy inputs
+    Patm(1)  = 1.      ! atm
+    depth(1) = zt      ! m
+    lat(1)   = 30.     ! degrees
+    temp(1)  = t_in    ! degC
+    sal(1)   = salinity! psu
+    alk(1)   = ta_in   ! mol/kg
+    dic(1)   = dic_in  ! mol/kg
+    sil(1)   = sit_in  ! mol/kg
+    phos(1)  = pt_in   ! mol/kg
+
+    ! NH4/H2S/Ca2+ default to "no effect" when not supplied by the caller:
+    ! nh4=0, h2s=0 contribute nothing to alkalinity; ca<=0 falls back to
+    ! mocsy's salinity-based estimate.
+    nh4(1) = 0.
+    h2s(1) = 0.
+    ca(1)  = -1.
+    if (present(nh4_in)) nh4(1) = nh4_in
+    if (present(h2s_in)) h2s(1) = h2s_in
+    if (present(ca_in))  ca(1)  = ca_in
+
+    if (apply_temperature_floor) then
+      temp(1)  = max(temp(1),minimum_temperature) ! degC
+    endif
+
+    if (apply_epsln_floor) then
+      ! epsln is intentionally left unscaled by conc_scale
+      sal(1)   = max(sal(1),epsln)  
+      alk(1)   = max(alk(1),epsln)  
+      dic(1)   = max(dic(1),epsln)  
+      sil(1)   = max(sil(1),epsln)  
+      phos(1)  = max(phos(1),epsln) 
+    endif
+
+    if (apply_species_ceiling) then
+      ! max_species_value is the constant here, defined natively in mol/kg; multiply
+      ! by conc_scale to push it up into the caller's units before comparing.
+      alk(1)   = min(alk(1),max_species_value*conc_scale)  
+      dic(1)   = min(dic(1),max_species_value*conc_scale)  
+      sil(1)   = min(sil(1),max_species_value*conc_scale)  
+      phos(1)  = min(phos(1),max_species_value*conc_scale) 
+    endif
+
+    if (apply_salinity_ceiling) then
+      sal(1)   = min(sal(1),maximum_salinity)  
+    endif
+
+    call vars(ph, pco2, fco2, co2, hco3, co3, OmegaA, OmegaC, BetaD, rhoSW, p, tempis, &
+             temp, sal, alk, dic, sil, phos, Patm, depth, lat, 1,                     &
+             optCON=optCON, optT='Tpot   ', optP='m ', optb=boron_formulation,        &
+             optK1K2=dissociation_constants, optkf=hf_equilibrium_constant,           &
+             optgas='Pinsitu',verbose=print_oor_warnings,                             &
+             nh4=nh4, h2s=h2s, ca=ca)
+
+    htotal = 10.**(-1.*ph(1))
+
+    if (present(co2star))   co2star   = co2(1)
+    if (present(co3_ion))   co3_ion   = co3(1)
+    if (present(alpha))     alpha     = (co2(1)/(pco2(1)*1.e-6))
+    if (present(pCO2surf))  pCO2surf  = pco2(1)
+    if (present(omega_arag)) omega_arag = OmegaA(1)
+    if (present(omega_calc)) omega_calc = OmegaC(1)
+    if (present(ph_out))     ph_out     = ph(1)
+
+  else  !}{mask = 0.0
+
+    if (present(co3_ion))  co3_ion  = 0.0
+    if (present(co2star))  co2star  = 0.0
+    if (present(alpha))    alpha    = 0.0
+    if (present(pco2surf)) pCO2surf = 0.0
+
+  endif  !}mask
+
+return
+
+end subroutine  FMS_co2calc_point  !}
+! </SUBROUTINE> NAME="FMS_co2calc_point"
 
 end module  FMS_co2calc_mod  !}
