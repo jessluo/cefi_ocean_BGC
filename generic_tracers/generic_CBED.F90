@@ -190,7 +190,7 @@ module generic_CBED
 
    type(generic_CBED_type) :: cbed
 
-   
+
    real, parameter :: pi = acos(-1.0)
 
 
@@ -1237,10 +1237,11 @@ contains
       real, dimension(isc:iec,jsc:jec) :: dt_sub
 
       ! carbonate system related variables
-      ! real :: n_diss_calc, n_diss_arag, n_prec_calc
-      ! real :: k_diss_calc, k_diss_arag, k_prec_calc, k_prec_arag
-      ! real, dimension(isc:iec,jsc:jec,nk_cbed) :: R_diss_calc, R_diss_arag, R_prec_calc, R_prec_arag
-      real, dimension(isc:iec,jsc:jec,nk_cbed) :: htotal_dummy 
+      real :: n_diss_calc, n_diss_arag, n_prec_calc
+      real :: k_diss_calc, k_diss_arag, k_prec_calc, k_prec_arag
+      real, dimension(isc:iec,jsc:jec,nk_cbed) :: cbed_omega_arag, cbed_omega_calc
+      real, dimension(isc:iec,jsc:jec,nk_cbed) :: R_diss_calc, R_diss_arag, R_prec_calc, R_prec_arag
+      real, dimension(isc:iec,jsc:jec,nk_cbed) :: htotal_dummy
       real, dimension(isc:iec,jsc:jec,nk_cbed) :: c_h2s_co2, c_sio4_co2
 
 
@@ -1497,9 +1498,10 @@ contains
                cbed%no3_flux(i,j) = b_no3(i,j)
                cbed%dic_flux(i,j) = b_dic(i,j)
 
-               cbed%talk_flux(i,j) = por(i,j,1)*D_dic(i,j,1)*((max(0.0,cobalt%btm_alk(i,j)*cobalt%Rho_0) - c_talk(i,j,1))/(dz_cbed(1)/2.0)) + &
-                  por(i,j,1)*w(i,j,1)*max(0.0,cobalt%btm_alk(i,j)*cobalt%Rho_0) + &
-                  sum(dz_cbed(:)*por(i,j,1:nk_cbed)* bioirri(i,j,:)*(max(0.0,cobalt%btm_alk(i,j)*cobalt%Rho_0) - c_talk(i,j,:)) )
+               cbed%talk_flux(i,j) = b_alk(i,j)
+               ! cbed%talk_flux(i,j) = por(i,j,1)*D_dic(i,j,1)*((max(0.0,cobalt%btm_alk(i,j)*cobalt%Rho_0) - c_talk(i,j,1))/(dz_cbed(1)/2.0)) + &
+               !    por(i,j,1)*w(i,j,1)*max(0.0,cobalt%btm_alk(i,j)*cobalt%Rho_0) + &
+               !    sum(dz_cbed(:)*por(i,j,1:nk_cbed)* bioirri(i,j,:)*(max(0.0,cobalt%btm_alk(i,j)*cobalt%Rho_0) - c_talk(i,j,:)) )
 
                cbed%odu_flux(i,j) = b_odu(i,j)
 
@@ -1799,7 +1801,55 @@ contains
                            omega_calc=cbed%cbed_omega_calc(i,j,k), &
                            ph_out=cbed%cbed_ph(i,j,k))
 
-                           
+
+                        ! assign rate constants (RADI) {
+                        if (cbed%cbed_omega_arag(i,j,k) >= 0.835 .and. cbed%cbed_omega_arag(i,j,k) < 1.0) then
+                           n_diss_arag = 0.13
+                        else
+                           n_diss_arag = 1.46
+                        endif
+
+                        if (cbed%cbed_omega_calc(i,j,k) >= 0.828 .and. cbed%cbed_omega_calc(i,j,k) < 1.0) then
+                           n_diss_calc = 0.11
+                        else
+                           n_diss_calc = 4.7
+                        endif
+
+                        n_prec_calc = 1.76
+
+                        if (cbed%cbed_omega_arag(i,j,k) >= 0.835 .and. cbed%cbed_omega_arag(i,j,k) < 1.0) then
+                           k_diss_arag = (3.8*10.0**(-3.0))/spery
+                        else
+                           k_diss_arag = (4.2*10.0**(-2.0))/spery
+                        endif
+
+                        if (cbed%cbed_omega_calc(i,j,k) >= 0.835 .and. cbed%cbed_omega_calc(i,j,k) < 1.0) then
+                           k_diss_calc = (6.3*10.0**(-3.0))/spery
+                        else
+                           k_diss_calc = 20.0 /spery
+                        endif
+
+                        k_prec_calc = 0.4/spery
+                        k_prec_arag = 0.0
+                        !--RADI--!}
+
+                        ! R_diss_calc, R_diss_arag, R_prec_calc, R_prec_arag
+
+                        if (cbed%cbed_omega_arag(i,j,k) < 1.0) then
+                           R_diss_arag(i,j,k) = Q10_factor(i,j) * k_diss_arag * c_arag(i,j,k) * (1.0-cbed%cbed_omega_arag(i,j,k))**n_diss_arag
+                           R_prec_arag(i,j,k) = 0.0
+                        else
+                           R_diss_arag(i,j,k) = 0.0
+                           R_prec_arag(i,j,k) = k_prec_arag * (cbed%cbed_omega_arag(i,j,k) - 1.0)
+                        endif
+
+                        if (cbed%cbed_omega_calc(i,j,k) < 1.0) then
+                           R_diss_calc(i,j,k) = Q10_factor(i,j) * k_diss_calc * c_calc(i,j,k) * (1.0-cbed%cbed_omega_calc(i,j,k))**n_diss_calc
+                           R_prec_calc(i,j,k) = 0.0
+                        else
+                           R_diss_calc(i,j,k) = 0.0
+                           R_prec_calc(i,j,k) = k_prec_calc * (cbed%cbed_omega_calc(i,j,k) - 1.0)**n_prec_calc
+                        endif
 
                         !
                         !end carbonate system calculations
@@ -1812,7 +1862,8 @@ contains
                            svf(i,j,k)/por(i,j,k)*(1.0+1.0/cobalt%c_2_n - p_2_c(i,j))*(R_om1_anoxic(i,j,k)+R_om2_anoxic(i,j,k)+R_om3_anoxic(i,j,k)) - &
                            2.0*R_nox(i,j,k) - 1.0*R_oduox(i,j,k) - 0.4*R_ana(i,j,k)
 
-                        R_talk_inorg(i,j,k) = 0.0
+                        R_talk_inorg(i,j,k) = 2.0*svf(i,j,k)/por(i,j,k)*(R_diss_arag(i,j,k) + R_diss_calc(i,j,k)) - &
+                           2.0*(R_prec_arag(i,j,k) + R_prec_calc(i,j,k))
 
                         R_talk(i,j,k) = R_talk_org(i,j,k) + R_talk_inorg(i,j,k)
 
@@ -1840,13 +1891,20 @@ contains
                         por(i,j,1)*w(i,j,1)*abs(min(0.0,cobalt%btm_o2(i,j)*cobalt%Rho_0)) + &
                         sum(dz_cbed(:)*por(i,j,1:nk_cbed)* bioirri(i,j,:)*(abs(min(0.0,cobalt%btm_o2(i,j)*cobalt%Rho_0)) - c_odu(i,j,:)) )
 
-                     b_alk_sub(i,j) = sum(dz_cbed(:)*por(i,j,1:nk_cbed)*R_talk(i,j,:))  ! mol m-2 s-1 (net production of alklinity from organic matter degradation)
+                     b_alk_sub(i,j) = por(i,j,1)*D_dic(i,j,1)*((max(0.0,cobalt%btm_alk(i,j)*cobalt%Rho_0) - c_talk(i,j,1))/(dz_cbed(1)/2.0)) + &
+                        por(i,j,1)*w(i,j,1)*max(0.0,cobalt%btm_alk(i,j)*cobalt%Rho_0) + &
+                        sum(dz_cbed(:)*por(i,j,1:nk_cbed)* bioirri(i,j,:)*(max(0.0,cobalt%btm_alk(i,j)*cobalt%Rho_0) - c_talk(i,j,:)) )
 
-                     b_ca2_sub(i,j) = 0.0
-                     b_po4_sub(i,j) = 0.0
+                     !b_alk_sub(i,j) = sum(dz_cbed(:)*por(i,j,1:nk_cbed)*R_talk(i,j,:))  ! mol m-2 s-1 (net production of alklinity from organic matter degradation)
 
-                     !b_odu_sub(i,j) =  -1.0e-5
-                     !b_odu_sib(i,j) = max(b_odu_sub(i,j), -1.0e-6 )
+                     b_ca2_sub(i,j) = por(i,j,1)*D_ca2(i,j,1)*((max(0.0,fn_sw_ca2(cobalt%btm_salt(i,j), cobalt%Rho_0)) - c_ca2(i,j,1))/(dz_cbed(1)/2.0)) + &
+                        por(i,j,1)*w(i,j,1)*max(0.0,fn_sw_ca2(cobalt%btm_salt(i,j), cobalt%Rho_0)) + &
+                        sum(dz_cbed(:)*por(i,j,1:nk_cbed)* bioirri(i,j,:)*(max(0.0,fn_sw_ca2(cobalt%btm_salt(i,j), cobalt%Rho_0)) - c_ca2(i,j,:)) )
+
+                     b_po4_sub(i,j) = por(i,j,1)*D_po4(i,j,1)*((max(0.0,cobalt%f_po4(i,j,nk) * cobalt%Rho_0) - c_po4(i,j,1))/(dz_cbed(1)/2.0)) + &
+                        por(i,j,1)*w(i,j,1)*max(0.0,cobalt%f_po4(i,j,nk) * cobalt%Rho_0) + &
+                        sum(dz_cbed(:)*por(i,j,1:nk_cbed)* bioirri(i,j,:)*(max(0.0,cobalt%f_po4(i,j,nk) * cobalt%Rho_0) - c_po4(i,j,:)) )
+
 
                      ! ! check if there is any NaN or inf in b_odu. not required. can be deleted.
                      ! if (ieee_is_nan(b_odu_sub(i,j)) .or. .not. ieee_is_finite(b_odu_sub(i,j))) then
@@ -1859,8 +1917,8 @@ contains
                      cbed%cbed_b_no3_acc(i,j)  = cbed%cbed_b_no3_acc(i,j)  + b_no3_sub(i,j)  * (1.0 / real(n_sub(i,j)))
                      cbed%cbed_b_alk_acc(i,j)  = cbed%cbed_b_alk_acc(i,j)  + b_alk_sub(i,j)  * (1.0 / real(n_sub(i,j)))
                      cbed%cbed_b_odu_acc(i,j)  = cbed%cbed_b_odu_acc(i,j)  + b_odu_sub(i,j)  * (1.0 / real(n_sub(i,j)))
-                     cbed%cbed_b_ca2_acc(i,j) = 0.0 !edit later
-                     cbed%cbed_b_po4_acc(i,j) = 0.0 !edit later
+                     cbed%cbed_b_ca2_acc(i,j) = cbed%cbed_b_ca2_acc(i,j)  + b_ca2_sub(i,j)  * (1.0 / real(n_sub(i,j)))
+                     cbed%cbed_b_po4_acc(i,j) = cbed%cbed_b_po4_acc(i,j)  + b_po4_sub(i,j)  * (1.0 / real(n_sub(i,j)))
 
 
                      !
@@ -1887,6 +1945,7 @@ contains
                            (R_nox(i,j,k) - 0.6*R_ana(i,j,k)) + bioirri(i,j,k)*(max(0.0,cobalt%btm_no3(i,j)*cobalt%Rho_0) - c_no3(i,j,k)) )*dt_sub(i,j)
 
                         cbed%f_dic(i,j,k) = cbed%f_dic(i,j,k) + ( + svf(i,j,k)/por(i,j,k)*(R_dic_om1(i,j,k) + R_dic_om2(i,j,k) + R_dic_om3(i,j,k)) + &
+                           1.0*svf(i,j,k)/por(i,j,k)*(R_diss_arag(i,j,k) + R_diss_calc(i,j,k)) - 1.0*(R_prec_arag(i,j,k) + R_prec_calc(i,j,k)) + &
                            bioirri(i,j,k)*(max(0.0,cobalt%btm_dic(i,j)*cobalt%Rho_0) - c_dic(i,j,k)) )*dt_sub(i,j)
 
                         cbed%f_odu(i,j,k) = cbed%f_odu(i,j,k) + ( + svf(i,j,k)/por(i,j,k)*(R_om1_anoxic(i,j,k)+R_om2_anoxic(i,j,k)+R_om3_anoxic(i,j,k)) - &
@@ -1894,13 +1953,15 @@ contains
 
                         cbed%f_talk(i,j,k) = cbed%f_talk(i,j,k) + ( + R_talk(i,j,k) + bioirri(i,j,k)*(max(0.0,cobalt%btm_alk(i,j)*cobalt%Rho_0) - c_talk(i,j,k)) )*dt_sub(i,j)
 
-                        cbed%f_calc(i,j,k) = cbed%f_calc(i,j,k)
+                        cbed%f_calc(i,j,k) = cbed%f_calc(i,j,k) + ( - R_diss_calc(i,j,k) + por(i,j,k)/svf(i,j,k)*R_prec_calc(i,j,k) )*dt_sub(i,j)
 
-                        cbed%f_arag(i,j,k) = cbed%f_arag(i,j,k)
+                        cbed%f_arag(i,j,k) = cbed%f_arag(i,j,k) + ( - R_diss_arag(i,j,k) + por(i,j,k)/svf(i,j,k)*R_prec_arag(i,j,k) )*dt_sub(i,j)
 
-                        cbed%f_ca2(i,j,k) = cbed%f_ca2(i,j,k)
+                        cbed%f_ca2(i,j,k) = cbed%f_ca2(i,j,k) + ( svf(i,j,k)/por(i,j,k)*(R_diss_arag(i,j,k) + R_diss_calc(i,j,k)) - (R_prec_arag(i,j,k) + R_prec_calc(i,j,k)) + &
+                           bioirri(i,j,k)*(max(0.0,fn_sw_ca2(cobalt%btm_salt(i,j), cobalt%Rho_0)) - c_ca2(i,j,k)) )*dt_sub(i,j)
 
-                        cbed%f_po4(i,j,k) = cbed%f_po4(i,j,k) + ( + svf(i,j,k)/por(i,j,k)*p_2_c(i,j)*(R_dic_om1(i,j,k) + R_dic_om2(i,j,k) + R_dic_om3(i,j,k)) + bioirri(i,j,k)*(max(0.0,cobalt%f_po4(i,j,nk)*cobalt%Rho_0) - c_po4(i,j,k)) )*dt_sub(i,j)
+                        cbed%f_po4(i,j,k) = cbed%f_po4(i,j,k) + ( + svf(i,j,k)/por(i,j,k)*p_2_c(i,j)*(R_dic_om1(i,j,k) + R_dic_om2(i,j,k) + R_dic_om3(i,j,k)) + &
+                           bioirri(i,j,k)*(max(0.0,cobalt%f_po4(i,j,nk)*cobalt%Rho_0) - c_po4(i,j,k)) )*dt_sub(i,j)
 
 
 
@@ -2545,12 +2606,13 @@ contains
                ! for the b_alk, the net production of alkalinity from organics is added to the COBALT as porewater alkalinity
                ! profiles and resulting diffive fluxes are imcomplete without CaCO3 implemented in CBED.
 
-               !cobalt%b_dic(i,j) = b_dic(i,j)
-               cobalt%b_dic(i,j) =  - cobalt%fcased_redis(i,j) - cobalt%f_cadet_arag_btf(i,j,1) +       &
-                  b_dic(i,j)
+               cobalt%b_dic(i,j) = b_dic(i,j)
+               !cobalt%b_dic(i,j) =  - cobalt%fcased_redis(i,j) - cobalt%f_cadet_arag_btf(i,j,1) +       &
+               !   b_dic(i,j)
 
-               cobalt%b_alk(i,j) = - 2.0*(cobalt%fcased_redis(i,j)+cobalt%f_cadet_arag_btf(i,j,1)) -    &
-                  b_alk(i,j) !cbed_org_alk(i,j)
+               cobalt%b_alk(i,j) = b_alk(i,j)
+               !cobalt%b_alk(i,j) = - 2.0*(cobalt%fcased_redis(i,j)+cobalt%f_cadet_arag_btf(i,j,1)) -    &
+               !   b_alk(i,j) !cbed_org_alk(i,j)
 
                ! Add the ODU flux as added oxygen demand by the sediment because released ODU will be consummed in the bottom water.
                ! In absence of BW O2, it will create -ve O2 conc in BW. cbed%odu_flux(i,j) value is negative meaning efflux of ODU from sediment.
