@@ -15,6 +15,8 @@ module generic_CBED
    use fms_mod, only: error_mesg, NOTE, WARNING, FATAL
    use mpp_mod,           only: stdout
    use fms_mod,           only: stdout
+   use MOM_file_parser,   only : get_param, log_version, param_file_type, close_param_file
+   use cbed_param_doc,    only : get_CBED_param_file
    !use, intrinsic :: ieee_arithmetic ! for checking presence of NaN or inf
 
    implicit none; private
@@ -29,12 +31,49 @@ module generic_CBED
    integer, parameter :: nk_cbed = 20    ! Number of benthic layers
 
    type generic_CBED_type
-      ! TODO: change read_porosity_from_file into a namelist variable
-      logical :: read_porosity_from_file = .true.   ! flag to read porosity from file
-      logical :: use_depth_dependent_OM_frac = .true.   ! flag to calculate fractions of total organic matter flux assigned to each reactivity class as a func of bathymetric depth (m)
-      logical :: do_adaptive_time_stepping = .true.   ! flag to use adaptive time stepping | sub cycle dt over n steps to
+
+      ! ------------------------------------------------------------------
+      ! Runtime-configurable parameters.
+      ! All of these are set in generic_CBED_add_params from the CBED_input
+      ! file (see cbed_param_doc.F90); the defaults given there reproduce the
+      ! values that were previously hardcoded here and in the routines below.
+      ! Do NOT give them initializers - get_param supplies the defaults.
+      ! ------------------------------------------------------------------
+
+      ! Control flags
+      logical :: read_porosity_from_file      ! flag to read porosity from file
+      logical :: use_depth_dependent_OM_frac  ! flag to calculate fractions of total organic matter flux assigned to each reactivity class as a func of bathymetric depth (m)
+      logical :: do_adaptive_time_stepping    ! flag to use adaptive time stepping | sub cycle dt over n steps to
       ! ensure that the change in tracer concentration in each step does not exceed a certain threshold.
       ! This is to prevent negative when reaction rates are high and the time step is too large.
+
+      ! Reaction parameters
+      real :: k_adj_denit       ! multiplier on the OM decay rate under denitrification
+      real :: k_adj_anoxia      ! multiplier on the OM decay rate under anoxic (sulfate-reducing) conditions
+      real :: ks_o2             ! O2 half saturation constant (mol/m3)
+      real :: ks_no3            ! NO3 half saturation constant (mol/m3)
+      real :: k_nox             ! nitrification rate constant (mol-1 m3 s-1, converted from yr-1 on read)
+      real :: k_ana             ! anammox rate constant (mol-1 m3 s-1, converted from yr-1 on read)
+      real :: k_oduox           ! ODU oxidation rate constant (mol-1 m3 s-1, converted from yr-1 on read)
+      real :: Q10               ! temperature sensitivity of all reaction rates
+
+      ! Organic matter decay rate coefficients. k = coef * (POC flux)**exponent
+      real :: k1_coef           ! coefficient for OM1 (fast reacting) decay
+      real :: k2_coef           ! coefficient for OM2 (medium reacting) decay
+      real :: k3_coef           ! coefficient for OM3 (slow reacting) decay
+      real :: k_poc_exponent    ! POC flux exponent, shared by k1, k2 and k3
+
+      ! Adaptive time stepping controls
+      real    :: c_min_substep        ! tracer concentration below which the sub-step constraint is skipped (mol/m3)
+      real    :: max_depletion_frac   ! maximum fraction of a tracer that may be consumed in one sub-step
+      integer :: n_sub_max            ! hard cap on the number of sub-steps per macro step
+
+      ! Bioturbation and bioirrigation length scales
+      real :: Db_l              ! bioturbation length scale (m)
+      real :: bioirri_l         ! bioirrigation length scale (m)
+
+      ! Porosity used when read_porosity_from_file is false
+      real :: por_const         ! constant porosity; solid volume fraction is derived as 1 - por_const
 
       ! State variables
 
@@ -171,8 +210,8 @@ module generic_CBED
    real, parameter :: l_cbed = 0.20           ! length of sediment domain | sediment depth (m, 20 cm)
    real, parameter :: dz1_cbed = 0.001        ! thickness of the first layer (m). For increasing thickness
    real, parameter :: rho_s = 2.5             ! solid density (g/cm³)
-   real, parameter :: Db_l = 0.08             ! bioturbation length scale (m) 8 cm.
-   real, parameter :: bioirri_l = 0.018       ! bioirrigation length scale (m) 1.8 cm.
+   ! Db_l and bioirri_l are now runtime configurable and live in generic_CBED_type
+   ! as cbed%Db_l and cbed%bioirri_l (see generic_CBED_add_params).
 
    ! sediment grid and state variables (to be allocated)
    !real, allocatable :: dz_cbed(:)                 ! sediment layer thickness (m)
@@ -251,6 +290,120 @@ contains
       r = r_mid
    end function find_r
 
+   !> Read every runtime-configurable CBED parameter from the CBED_input file.
+   !!
+   !! Each default below is exactly the value that was previously hardcoded, so a run
+   !! with an empty CBED_input reproduces the pre-namelist model bit for bit.
+   subroutine generic_CBED_add_params(param_file)
+      type(param_file_type), intent(in) :: param_file !< structure indicating the parameter file to parse
+
+      ! ---------------- Control flags ----------------
+      call get_param(param_file, "generic_CBED", "CBED_READ_POROSITY_FROM_FILE", &
+                     cbed%read_porosity_from_file, &
+                     "If true, read sediment porosity from a data_override file. If false, "//&
+                     "use the uniform value CBED_POR_CONST.", default=.true.)
+      call get_param(param_file, "generic_CBED", "CBED_USE_DEPTH_DEPENDENT_OM_FRAC", &
+                     cbed%use_depth_dependent_OM_frac, &
+                     "If true, partition the settling organic matter flux among the three "//&
+                     "reactivity classes using a power law in bathymetric depth. If false, "//&
+                     "use a fixed 0.70/0.20/0.10 split.", default=.true.)
+      call get_param(param_file, "generic_CBED", "CBED_DO_ADAPTIVE_TIME_STEPPING", &
+                     cbed%do_adaptive_time_stepping, &
+                     "If true, sub-cycle the sediment reactions so that no tracer is depleted "//&
+                     "by more than CBED_MAX_DEPLETION_FRAC in any sub-step.", default=.true.)
+
+      ! ---------------- Reaction parameters ----------------
+      call get_param(param_file, "generic_CBED", "CBED_K_ADJ_DENIT", cbed%k_adj_denit, &
+                     "Multiplier applied to the organic matter decay rate along the "//&
+                     "denitrification pathway, relative to aerobic respiration.", &
+                     units="unitless", default=0.1)
+      call get_param(param_file, "generic_CBED", "CBED_K_ADJ_ANOXIA", cbed%k_adj_anoxia, &
+                     "Multiplier applied to the organic matter decay rate along the anoxic "//&
+                     "(sulfate reducing) pathway, relative to aerobic respiration.", &
+                     units="unitless", default=0.001)
+      call get_param(param_file, "generic_CBED", "CBED_KS_O2", cbed%ks_o2, &
+                     "Half saturation constant for O2. Used both as a limitation term for "//&
+                     "aerobic respiration and as an inhibition term for the anaerobic pathways.", &
+                     units="mol m-3", default=0.008)
+      call get_param(param_file, "generic_CBED", "CBED_KS_NO3", cbed%ks_no3, &
+                     "Half saturation constant for NO3. Used both as a limitation term for "//&
+                     "denitrification and as an inhibition term for sulfate reduction.", &
+                     units="mol m-3", default=0.001)
+
+      ! The three rate constants below are given in yr-1 for readability, matching the
+      ! source literature, and converted to s-1 immediately after being read.
+      ! TODO: once this first pass is confirmed to reproduce, replace the explicit
+      ! division with get_param's scale=I_spery argument (as generic_COBALT.F90:389 does
+      ! with I_sperd) and add I_spery to the cobalt_types use list at the top of this
+      ! module. Deferred here because get_param applies value = scale*value, and
+      ! multiplying by the reciprocal is not bit-identical to dividing, so making the
+      ! switch now would perturb the checksums this pass is meant to preserve.
+      call get_param(param_file, "generic_CBED", "CBED_K_NOX", cbed%k_nox, &
+                     "Second order nitrification rate constant.", &
+                     units="mol-1 m3 yr-1", default=2.0e5)
+      cbed%k_nox = cbed%k_nox / spery
+
+      call get_param(param_file, "generic_CBED", "CBED_K_ANA", cbed%k_ana, &
+                     "Second order anammox rate constant.", &
+                     units="mol-1 m3 yr-1", default=1.0e5)
+      cbed%k_ana = cbed%k_ana / spery
+
+      call get_param(param_file, "generic_CBED", "CBED_K_ODUOX", cbed%k_oduox, &
+                     "Second order rate constant for the re-oxidation of oxygen demand "//&
+                     "units (ODU, i.e. H2S).", &
+                     units="mol-1 m3 yr-1", default=1.0e5)
+      cbed%k_oduox = cbed%k_oduox / spery
+
+      call get_param(param_file, "generic_CBED", "CBED_Q10", cbed%Q10, &
+                     "cbed%Q10 temperature sensitivity applied to all sediment reaction rates.", &
+                     units="unitless", default=1.88)
+
+      ! ---------------- Organic matter decay rate coefficients ----------------
+      call get_param(param_file, "generic_CBED", "CBED_K1_COEF", cbed%k1_coef, &
+                     "Coefficient for the decay rate of OM1, the fast reacting organic "//&
+                     "matter class.", units="yr-1 (umol C cm-2 yr-1)-p", default=0.15)
+      call get_param(param_file, "generic_CBED", "CBED_K2_COEF", cbed%k2_coef, &
+                     "Coefficient for the decay rate of OM2, the medium reacting organic "//&
+                     "matter class.", units="yr-1 (umol C cm-2 yr-1)-p", default=0.0015)
+      call get_param(param_file, "generic_CBED", "CBED_K3_COEF", cbed%k3_coef, &
+                     "Coefficient for the decay rate of OM3, the slow reacting organic "//&
+                     "matter class.", units="yr-1 (umol C cm-2 yr-1)-p", default=0.00009)
+      call get_param(param_file, "generic_CBED", "CBED_K_POC_EXPONENT", cbed%k_poc_exponent, &
+                     "Exponent p on the POC flux in the organic matter decay rate "//&
+                     "expressions. Shared by OM1, OM2 and OM3.", &
+                     units="unitless", default=0.85)
+
+      ! ---------------- Adaptive time stepping controls ----------------
+      call get_param(param_file, "generic_CBED", "CBED_C_MIN_SUBSTEP", cbed%c_min_substep, &
+                     "Tracer concentration below which a tracer is ignored when choosing "//&
+                     "the number of reaction sub-steps.", units="mol m-3", default=1.0e-6)
+      call get_param(param_file, "generic_CBED", "CBED_MAX_DEPLETION_FRAC", cbed%max_depletion_frac, &
+                     "Maximum fraction of a tracer that may be consumed in a single reaction "//&
+                     "sub-step. Smaller values give more sub-steps and a more stable solution.", &
+                     units="unitless", default=0.8)
+      call get_param(param_file, "generic_CBED", "CBED_N_SUB_MAX", cbed%n_sub_max, &
+                     "Hard cap on the number of reaction sub-steps taken per macro time step. "//&
+                     "May need to be raised where coastal organic matter fluxes are large.", &
+                     units="nondim", default=120)
+
+      ! ---------------- Bioturbation and bioirrigation length scales ----------------
+      call get_param(param_file, "generic_CBED", "CBED_DB_L", cbed%Db_l, &
+                     "E-folding length scale of the Gaussian decay of the bioturbation "//&
+                     "coefficient with depth into the sediment.", &
+                     units="m", default=0.08)
+      call get_param(param_file, "generic_CBED", "CBED_BIOIRRI_L", cbed%bioirri_l, &
+                     "E-folding length scale of the Gaussian decay of the bioirrigation "//&
+                     "rate with depth into the sediment.", &
+                     units="m", default=0.018)
+
+      ! ---------------- Porosity ----------------
+      call get_param(param_file, "generic_CBED", "CBED_POR_CONST", cbed%por_const, &
+                     "Uniform sediment porosity, used only when CBED_READ_POROSITY_FROM_FILE "//&
+                     "is false. The solid volume fraction is derived as 1 - CBED_POR_CONST.", &
+                     units="unitless", default=0.8)
+
+   end subroutine generic_CBED_add_params
+
    subroutine generic_CBED_init(isc,iec,jsc,jec,isd,ied,jsd,jed,nk)
       integer,     intent(in) :: isc,iec,jsc,jec,isd,ied,jsd,jed,nk
       !Locals
@@ -262,11 +415,26 @@ contains
       integer :: i,j,k !for grid.
       real    :: r ! for grid
 
+      type(param_file_type) :: param_file !< structure indicating the parameter file to parse
+      !
+      ! This include declares and sets the variable "version". (copied from generic_COBALT.F90)
+# include "version_variable.h"
+
       !real,dimension(isc:iec,jsc:jec,nk_cbed)    :: cbed_tmask
       ! Make a cbed mask. Note: it seems grid_tmask(:,:,k) does not depend on k
       ! Note that grid_tmask is already on isc:iec, jsc:jec
       !do j = jsc, jec; do i = isc, iec; do k=1,nk_cbed ;
       !   cbed_tmask(i,j,k) = grid_tmask(i,j,nk) ; enddo; enddo; enddo
+
+      !Read the runtime-configurable parameters before anything else in this routine,
+      !so that every later consumer sees populated values. generic_CBED_init is called
+      !from generic_COBALT.F90 user_allocate_arrays, which runs during generic_tracer_init
+      !and therefore strictly before generic_CBED_reg_diagnostics and
+      !generic_CBED_update_from_source.
+      call get_CBED_param_file(param_file)
+      call log_version(param_file, "CBED", version, "", log_to_all=.true.)
+      call generic_CBED_add_params(param_file)
+      call close_param_file(param_file)
 
       !Allocate and initialize CBED arrays for tracer concentrations and other workarrays
       allocate(cbed%f_o2(isd:ied,jsd:jed,nk_cbed));cbed%f_o2=0.0
@@ -1045,17 +1213,9 @@ contains
       real, dimension(isc:iec,jsc:jec) :: cbed_org_alk  ! organic alkalinity production from OM degradation
 
 
-      real, parameter :: k_adj_denit = 0.1
-      real, parameter :: k_adj_anoxia = 0.001
 
-      real, parameter :: ks_o2 = 0.008   ! O2 half saturation constant (mol/m3)
-      real, parameter :: ks_no3 = 0.001  ! NO3 half saturation constant (mol/m3)
 
-      real, parameter :: k_nox = (2.0*10.0**5.0)/spery   ! 2e5 ! mol-1 m3 s-1 (from the original: mmol-1 L yr-1) !nitrification rate constant
-      real, parameter :: k_ana = (10.0**5.0) /spery     !   ! 1e5               !anammox rate constant
-      real, parameter :: k_oduox = (10.0**5.0) /spery   !              1e6      !ODU oxidation rate constant
 
-      real, parameter :: Q10 = 1.88
       real, dimension(isc:iec,jsc:jec) :: Q10_factor
 
       ! Reaction rates
@@ -1115,8 +1275,15 @@ contains
             do i = isc, iec
                if (grid_kmt(i,j) .gt. 0) then
                   do k = 1, nk_cbed+1
-                     por(i,j,k) = 0.8
-                     svf(i,j,k) = 0.2
+                     ! svf is derived rather than set from its own literal, matching
+                     ! what the read-from-file branch above does, so that porosity and
+                     ! solid volume fraction cannot drift apart. Note this is a 1 ulp
+                     ! change from the previous hardcoded 0.2 (1.0-0.8 /= 0.2 in binary),
+                     ! and so is the one place in this namelist conversion that does not
+                     ! reproduce exactly. It affects only this branch, which is not the
+                     ! default (CBED_READ_POROSITY_FROM_FILE defaults to true).
+                     por(i,j,k) = cbed%por_const
+                     svf(i,j,k) = 1.0 - cbed%por_const
                   enddo
                endif
             enddo
@@ -1134,7 +1301,7 @@ contains
                !-------------------------
                ! calculate Q10 factor
                !-------------------------
-               Q10_factor(i,j) = Q10**( (cobalt%btm_temp(i,j)-4.0)/10.0 )
+               Q10_factor(i,j) = cbed%Q10**( (cobalt%btm_temp(i,j)-4.0)/10.0 )
 
                !----------------------------------
                ! Sedimentation rate calculation
@@ -1159,7 +1326,7 @@ contains
 
                do k = 1, nk_cbed+1
                   ! relation from Archer. POC flux unit in umol cm-2 y-1.
-                  Db(i,j,k) = max(0.0, Db_0(i,j)*exp(-(z_cbed_int(k)/Db_l)**2.0)*(max(0.0,cobalt%btm_o2(i,j)*cobalt%Rho_0)/(max(0.0,cobalt%btm_o2(i,j)*cobalt%Rho_0)+(20.0/1e3))) )
+                  Db(i,j,k) = max(0.0, Db_0(i,j)*exp(-(z_cbed_int(k)/cbed%Db_l)**2.0)*(max(0.0,cobalt%btm_o2(i,j)*cobalt%Rho_0)/(max(0.0,cobalt%btm_o2(i,j)*cobalt%Rho_0)+(20.0/1e3))) )
                enddo
 
                !--------------------
@@ -1171,7 +1338,7 @@ contains
                   ((cobalt%fntot_btm(i,j)*cobalt%c_2_n *1e6/1e4*spery)/((cobalt%fntot_btm(i,j)*cobalt%c_2_n *1e6/1e4*spery)+30.0)) )/spery   ! in cobalt unit s^-1
                do k = 1, nk_cbed
                   ! relation from Archer. POC flux unit in umol cm-2 y-1.
-                  bioirri(i,j,k) = max(0.0, bioirri_0(i,j)*exp(-(z_cbed_mid(k)/bioirri_l)**2.0) )
+                  bioirri(i,j,k) = max(0.0, bioirri_0(i,j)*exp(-(z_cbed_mid(k)/cbed%bioirri_l)**2.0) )
                enddo
 
                !-----------------------------------
@@ -1189,9 +1356,9 @@ contains
                !Calculate OM decay rates. k1,k2,k3 [unit: s-1]
                !------------------
                ! POC flux unit in umol cm-2 y-1. Unit of k is y-1
-               k1(i,j) = ( 0.15*(cobalt%fntot_btm(i,j)*cobalt%c_2_n *1e6/1e4*spery)**(0.85) )/spery
-               k2(i,j) = ( 0.0015*(cobalt%fntot_btm(i,j)*cobalt%c_2_n *1e6/1e4*spery)**(0.85) )/spery
-               k3(i,j) = ( 0.00009*(cobalt%fntot_btm(i,j)*cobalt%c_2_n *1e6/1e4*spery)**(0.85) )/spery
+               k1(i,j) = ( cbed%k1_coef*(cobalt%fntot_btm(i,j)*cobalt%c_2_n *1e6/1e4*spery)**(cbed%k_poc_exponent) )/spery
+               k2(i,j) = ( cbed%k2_coef*(cobalt%fntot_btm(i,j)*cobalt%c_2_n *1e6/1e4*spery)**(cbed%k_poc_exponent) )/spery
+               k3(i,j) = ( cbed%k3_coef*(cobalt%fntot_btm(i,j)*cobalt%c_2_n *1e6/1e4*spery)**(cbed%k_poc_exponent) )/spery
 
 
                !-----------------------
@@ -1219,28 +1386,28 @@ contains
                do k = 1, nk_cbed
 
                   ! O₂ reaction rates
-                  R_om1_o2(i,j,k) = k1(i,j)*c_om1(i,j,k)*(c_o2(i,j,k)/(ks_o2 + c_o2(i,j,k))) * Q10_factor(i,j)
-                  R_om2_o2(i,j,k) = k2(i,j)*c_om2(i,j,k)*(c_o2(i,j,k)/(ks_o2 + c_o2(i,j,k))) * Q10_factor(i,j)
-                  R_om3_o2(i,j,k) = k3(i,j)*c_om3(i,j,k)*(c_o2(i,j,k)/(ks_o2 + c_o2(i,j,k))) * Q10_factor(i,j)
+                  R_om1_o2(i,j,k) = k1(i,j)*c_om1(i,j,k)*(c_o2(i,j,k)/(cbed%ks_o2 + c_o2(i,j,k))) * Q10_factor(i,j)
+                  R_om2_o2(i,j,k) = k2(i,j)*c_om2(i,j,k)*(c_o2(i,j,k)/(cbed%ks_o2 + c_o2(i,j,k))) * Q10_factor(i,j)
+                  R_om3_o2(i,j,k) = k3(i,j)*c_om3(i,j,k)*(c_o2(i,j,k)/(cbed%ks_o2 + c_o2(i,j,k))) * Q10_factor(i,j)
                   ! NO₃ reaction rates
-                  R_om1_no3(i,j,k) = k_adj_denit*k1(i,j)*c_om1(i,j,k)*(c_no3(i,j,k)/(ks_no3 + c_no3(i,j,k)))*(ks_o2/(ks_o2 + c_o2(i,j,k))) * Q10_factor(i,j)
-                  R_om2_no3(i,j,k) = k_adj_denit*k2(i,j)*c_om2(i,j,k)*(c_no3(i,j,k)/(ks_no3 + c_no3(i,j,k)))*(ks_o2/(ks_o2 + c_o2(i,j,k))) * Q10_factor(i,j)
-                  R_om3_no3(i,j,k) = k_adj_denit*k3(i,j)*c_om3(i,j,k)*(c_no3(i,j,k)/(ks_no3 + c_no3(i,j,k)))*(ks_o2/(ks_o2 + c_o2(i,j,k))) * Q10_factor(i,j)
+                  R_om1_no3(i,j,k) = cbed%k_adj_denit*k1(i,j)*c_om1(i,j,k)*(c_no3(i,j,k)/(cbed%ks_no3 + c_no3(i,j,k)))*(cbed%ks_o2/(cbed%ks_o2 + c_o2(i,j,k))) * Q10_factor(i,j)
+                  R_om2_no3(i,j,k) = cbed%k_adj_denit*k2(i,j)*c_om2(i,j,k)*(c_no3(i,j,k)/(cbed%ks_no3 + c_no3(i,j,k)))*(cbed%ks_o2/(cbed%ks_o2 + c_o2(i,j,k))) * Q10_factor(i,j)
+                  R_om3_no3(i,j,k) = cbed%k_adj_denit*k3(i,j)*c_om3(i,j,k)*(c_no3(i,j,k)/(cbed%ks_no3 + c_no3(i,j,k)))*(cbed%ks_o2/(cbed%ks_o2 + c_o2(i,j,k))) * Q10_factor(i,j)
                   ! ODU reaction rates
-                  R_om1_anoxic(i,j,k) = k_adj_anoxia*k1(i,j)*c_om1(i,j,k)*(ks_no3/(ks_no3 + c_no3(i,j,k)))*(ks_o2/(ks_o2 + c_o2(i,j,k))) * Q10_factor(i,j)
-                  R_om2_anoxic(i,j,k) = k_adj_anoxia*k2(i,j)*c_om2(i,j,k)*(ks_no3/(ks_no3 + c_no3(i,j,k)))*(ks_o2/(ks_o2 + c_o2(i,j,k))) * Q10_factor(i,j)
-                  R_om3_anoxic(i,j,k) = k_adj_anoxia*k3(i,j)*c_om3(i,j,k)*(ks_no3/(ks_no3 + c_no3(i,j,k)))*(ks_o2/(ks_o2 + c_o2(i,j,k))) * Q10_factor(i,j)
+                  R_om1_anoxic(i,j,k) = cbed%k_adj_anoxia*k1(i,j)*c_om1(i,j,k)*(cbed%ks_no3/(cbed%ks_no3 + c_no3(i,j,k)))*(cbed%ks_o2/(cbed%ks_o2 + c_o2(i,j,k))) * Q10_factor(i,j)
+                  R_om2_anoxic(i,j,k) = cbed%k_adj_anoxia*k2(i,j)*c_om2(i,j,k)*(cbed%ks_no3/(cbed%ks_no3 + c_no3(i,j,k)))*(cbed%ks_o2/(cbed%ks_o2 + c_o2(i,j,k))) * Q10_factor(i,j)
+                  R_om3_anoxic(i,j,k) = cbed%k_adj_anoxia*k3(i,j)*c_om3(i,j,k)*(cbed%ks_no3/(cbed%ks_no3 + c_no3(i,j,k)))*(cbed%ks_o2/(cbed%ks_o2 + c_o2(i,j,k))) * Q10_factor(i,j)
 
                   ! dic
                   R_dic_om1(i,j,k) = (R_om1_o2(i,j,k) + R_om1_no3(i,j,k) + R_om1_anoxic(i,j,k))
                   R_dic_om2(i,j,k) = (R_om2_o2(i,j,k) + R_om2_no3(i,j,k) + R_om2_anoxic(i,j,k))
                   R_dic_om3(i,j,k) = (R_om3_o2(i,j,k) + R_om3_no3(i,j,k) + R_om3_anoxic(i,j,k))
                   ! nitrification
-                  R_nox(i,j,k) = k_nox*c_nh4(i,j,k)*c_o2(i,j,k) * Q10_factor(i,j)
+                  R_nox(i,j,k) = cbed%k_nox*c_nh4(i,j,k)*c_o2(i,j,k) * Q10_factor(i,j)
                   ! anammox
-                  R_ana(i,j,k) = k_ana*c_nh4(i,j,k)*c_no3(i,j,k) * Q10_factor(i,j) !* (ks_o2/(ks_o2 + cbed%f_o2(i,j,k)))
+                  R_ana(i,j,k) = cbed%k_ana*c_nh4(i,j,k)*c_no3(i,j,k) * Q10_factor(i,j) !* (ks_o2/(ks_o2 + cbed%f_o2(i,j,k)))
                   ! ODU oxidation
-                  R_oduox(i,j,k) = k_oduox*c_odu(i,j,k)*c_o2(i,j,k) * Q10_factor(i,j)
+                  R_oduox(i,j,k) = cbed%k_oduox*c_odu(i,j,k)*c_o2(i,j,k) * Q10_factor(i,j)
                   odu_depo(i,j,k) = (R_om1_anoxic(i,j,k)+R_om2_anoxic(i,j,k)+R_om3_anoxic(i,j,k))*min(1.0, 0.233*(w(i,j,k)*100.0*spery)**0.336)
 
                   ! TA calculation
@@ -1449,17 +1616,17 @@ contains
                      ! 1. OXYGEN CONSTRAINT
                      ! Sinks: Aerobic Respiration, Nitrification, ODU Oxidation
                      ! ---------------------------------------------------------
-                     if (c_o2(i,j,k) > 1.0e-6) then
+                     if (c_o2(i,j,k) > cbed%c_min_substep) then
                         max_o2_sink = svf(i,j,k)/por(i,j,k)*(R_om1_o2(i,j,k) + R_om2_o2(i,j,k) + R_om3_o2(i,j,k)) + &
                            (2.0*R_nox(i,j,k)+R_oduox(i,j,k))
 
                         ! The maximum sink is the total amount of O2 that could be consumed in this time step based on the current concentrations and reaction rates.
-                        ! We divide by 0.5*c_o2, to get the number of sub-steps needed to ensure that we don't drop the cell concentration more than half in one time step.
+                        ! We divide by CBED_MAX_DEPLETION_FRAC*c_o2, to get the number of sub-steps needed to ensure that we don't drop the cell concentration by more than that fraction in one time step.
                         ! This is a conservative estimate to ensure we don't overshoot and get negative concentrations.
                         ! We then take the ceiling of this number to get the number of sub-steps needed to ensure that we don't consume more O2 than is available in any sub-step.
                         ! We do this for O2, NO3, and NH4 and take the maximum number of sub-steps required among the three to ensure that we don't violate any of the constraints.
 
-                        n_req_o2 = ceiling( (max_o2_sink * dt) / (0.8 * c_o2(i,j,k)) )
+                        n_req_o2 = ceiling( (max_o2_sink * dt) / (cbed%max_depletion_frac * c_o2(i,j,k)) )
                         if (n_req_o2 > n_sub(i,j)) n_sub(i,j) = n_req_o2
                      endif
 
@@ -1467,10 +1634,10 @@ contains
                      ! 2. NITRATE CONSTRAINT
                      ! Sinks: Denitrification, Anammox
                      ! ---------------------------------------------------------
-                     if (c_no3(i,j,k) > 1.0e-6) then
+                     if (c_no3(i,j,k) > cbed%c_min_substep) then
                         max_no3_sink = svf(i,j,k)/por(i,j,k)*0.8*(R_om1_no3(i,j,k) + R_om2_no3(i,j,k) + R_om3_no3(i,j,k)) + R_ana(i,j,k)
 
-                        n_req_no3 = ceiling( (max_no3_sink * dt) / (0.8 * c_no3(i,j,k)) )
+                        n_req_no3 = ceiling( (max_no3_sink * dt) / (cbed%max_depletion_frac * c_no3(i,j,k)) )
                         if (n_req_no3 > n_sub(i,j)) n_sub(i,j) = n_req_no3
                      endif
 
@@ -1478,10 +1645,10 @@ contains
                      ! 3. AMMONIUM CONSTRAINT
                      ! Sinks: Nitrification, Anammox
                      ! ---------------------------------------------------------
-                     if (c_nh4(i,j,k) > 1.0e-6) then
+                     if (c_nh4(i,j,k) > cbed%c_min_substep) then
                         max_nh4_sink = R_nox(i,j,k) + R_ana(i,j,k)
 
-                        n_req_nh4 = ceiling( (max_nh4_sink * dt) / (0.8 * c_nh4(i,j,k)) )
+                        n_req_nh4 = ceiling( (max_nh4_sink * dt) / (cbed%max_depletion_frac * c_nh4(i,j,k)) )
                         if (n_req_nh4 > n_sub(i,j)) n_sub(i,j) = n_req_nh4
                      endif
 
@@ -1489,10 +1656,10 @@ contains
                      ! 4. ODU CONSTRAINT
                      ! Sinks: ODU oxidation
                      ! ---------------------------------------------------------
-                     if (c_odu(i,j,k) > 1.0e-6) then
+                     if (c_odu(i,j,k) > cbed%c_min_substep) then
                         max_odu_sink = R_oduox(i,j,k)
 
-                        n_req_odu = ceiling( (max_odu_sink * dt) / (0.8 * c_odu(i,j,k)) )
+                        n_req_odu = ceiling( (max_odu_sink * dt) / (cbed%max_depletion_frac * c_odu(i,j,k)) )
                         if (n_req_odu > n_sub(i,j)) n_sub(i,j) = n_req_odu
                      endif
 
@@ -1505,7 +1672,7 @@ contains
          ! Note: This cap can be increased depending on how aggressive the coastal fluxes may get.
          do j = jsc, jec
             do i = isc, iec
-               n_sub(i,j) = min(n_sub(i,j), 120)
+               n_sub(i,j) = min(n_sub(i,j), cbed%n_sub_max)
                dt_sub(i,j) = dt / real(n_sub(i,j))
             enddo
          enddo
@@ -1540,28 +1707,28 @@ contains
 
 
                         ! O₂ reaction rates
-                        R_om1_o2(i,j,k) = k1(i,j)*c_om1(i,j,k)*(c_o2(i,j,k)/(ks_o2 + c_o2(i,j,k))) * Q10_factor(i,j)
-                        R_om2_o2(i,j,k) = k2(i,j)*c_om2(i,j,k)*(c_o2(i,j,k)/(ks_o2 + c_o2(i,j,k))) * Q10_factor(i,j)
-                        R_om3_o2(i,j,k) = k3(i,j)*c_om3(i,j,k)*(c_o2(i,j,k)/(ks_o2 + c_o2(i,j,k))) * Q10_factor(i,j)
+                        R_om1_o2(i,j,k) = k1(i,j)*c_om1(i,j,k)*(c_o2(i,j,k)/(cbed%ks_o2 + c_o2(i,j,k))) * Q10_factor(i,j)
+                        R_om2_o2(i,j,k) = k2(i,j)*c_om2(i,j,k)*(c_o2(i,j,k)/(cbed%ks_o2 + c_o2(i,j,k))) * Q10_factor(i,j)
+                        R_om3_o2(i,j,k) = k3(i,j)*c_om3(i,j,k)*(c_o2(i,j,k)/(cbed%ks_o2 + c_o2(i,j,k))) * Q10_factor(i,j)
                         ! NO₃ reaction rates
-                        R_om1_no3(i,j,k) = k_adj_denit*k1(i,j)*c_om1(i,j,k)*(c_no3(i,j,k)/(ks_no3 + c_no3(i,j,k)))*(ks_o2/(ks_o2 + c_o2(i,j,k))) * Q10_factor(i,j)
-                        R_om2_no3(i,j,k) = k_adj_denit*k2(i,j)*c_om2(i,j,k)*(c_no3(i,j,k)/(ks_no3 + c_no3(i,j,k)))*(ks_o2/(ks_o2 + c_o2(i,j,k))) * Q10_factor(i,j)
-                        R_om3_no3(i,j,k) = k_adj_denit*k3(i,j)*c_om3(i,j,k)*(c_no3(i,j,k)/(ks_no3 + c_no3(i,j,k)))*(ks_o2/(ks_o2 + c_o2(i,j,k))) * Q10_factor(i,j)
+                        R_om1_no3(i,j,k) = cbed%k_adj_denit*k1(i,j)*c_om1(i,j,k)*(c_no3(i,j,k)/(cbed%ks_no3 + c_no3(i,j,k)))*(cbed%ks_o2/(cbed%ks_o2 + c_o2(i,j,k))) * Q10_factor(i,j)
+                        R_om2_no3(i,j,k) = cbed%k_adj_denit*k2(i,j)*c_om2(i,j,k)*(c_no3(i,j,k)/(cbed%ks_no3 + c_no3(i,j,k)))*(cbed%ks_o2/(cbed%ks_o2 + c_o2(i,j,k))) * Q10_factor(i,j)
+                        R_om3_no3(i,j,k) = cbed%k_adj_denit*k3(i,j)*c_om3(i,j,k)*(c_no3(i,j,k)/(cbed%ks_no3 + c_no3(i,j,k)))*(cbed%ks_o2/(cbed%ks_o2 + c_o2(i,j,k))) * Q10_factor(i,j)
                         ! ODU reaction rates
-                        R_om1_anoxic(i,j,k) = k_adj_anoxia*k1(i,j)*c_om1(i,j,k)*(ks_no3/(ks_no3 + c_no3(i,j,k)))*(ks_o2/(ks_o2 + c_o2(i,j,k))) * Q10_factor(i,j)
-                        R_om2_anoxic(i,j,k) = k_adj_anoxia*k2(i,j)*c_om2(i,j,k)*(ks_no3/(ks_no3 + c_no3(i,j,k)))*(ks_o2/(ks_o2 + c_o2(i,j,k))) * Q10_factor(i,j)
-                        R_om3_anoxic(i,j,k) = k_adj_anoxia*k3(i,j)*c_om3(i,j,k)*(ks_no3/(ks_no3 + c_no3(i,j,k)))*(ks_o2/(ks_o2 + c_o2(i,j,k))) * Q10_factor(i,j)
+                        R_om1_anoxic(i,j,k) = cbed%k_adj_anoxia*k1(i,j)*c_om1(i,j,k)*(cbed%ks_no3/(cbed%ks_no3 + c_no3(i,j,k)))*(cbed%ks_o2/(cbed%ks_o2 + c_o2(i,j,k))) * Q10_factor(i,j)
+                        R_om2_anoxic(i,j,k) = cbed%k_adj_anoxia*k2(i,j)*c_om2(i,j,k)*(cbed%ks_no3/(cbed%ks_no3 + c_no3(i,j,k)))*(cbed%ks_o2/(cbed%ks_o2 + c_o2(i,j,k))) * Q10_factor(i,j)
+                        R_om3_anoxic(i,j,k) = cbed%k_adj_anoxia*k3(i,j)*c_om3(i,j,k)*(cbed%ks_no3/(cbed%ks_no3 + c_no3(i,j,k)))*(cbed%ks_o2/(cbed%ks_o2 + c_o2(i,j,k))) * Q10_factor(i,j)
 
                         ! dic
                         R_dic_om1(i,j,k) = (R_om1_o2(i,j,k) + R_om1_no3(i,j,k) + R_om1_anoxic(i,j,k))
                         R_dic_om2(i,j,k) = (R_om2_o2(i,j,k) + R_om2_no3(i,j,k) + R_om2_anoxic(i,j,k))
                         R_dic_om3(i,j,k) = (R_om3_o2(i,j,k) + R_om3_no3(i,j,k) + R_om3_anoxic(i,j,k))
                         ! nitrification
-                        R_nox(i,j,k) = k_nox*c_nh4(i,j,k)*c_o2(i,j,k) * Q10_factor(i,j)
+                        R_nox(i,j,k) = cbed%k_nox*c_nh4(i,j,k)*c_o2(i,j,k) * Q10_factor(i,j)
                         ! anammox
-                        R_ana(i,j,k) = k_ana*c_nh4(i,j,k)*c_no3(i,j,k) * Q10_factor(i,j) !* (ks_o2/(ks_o2 + cbed%f_o2(i,j,k)))
+                        R_ana(i,j,k) = cbed%k_ana*c_nh4(i,j,k)*c_no3(i,j,k) * Q10_factor(i,j) !* (ks_o2/(ks_o2 + cbed%f_o2(i,j,k)))
                         ! ODU oxidation
-                        R_oduox(i,j,k) = k_oduox*c_odu(i,j,k)*c_o2(i,j,k) * Q10_factor(i,j)
+                        R_oduox(i,j,k) = cbed%k_oduox*c_odu(i,j,k)*c_o2(i,j,k) * Q10_factor(i,j)
                         odu_depo(i,j,k) = (R_om1_anoxic(i,j,k)+R_om2_anoxic(i,j,k)+R_om3_anoxic(i,j,k))*min(1.0, 0.233*(w(i,j,k)*100.0*spery)**0.336)
 
                         ! TA calculation
