@@ -43,10 +43,12 @@ module cobalt_types
   integer, parameter, public :: NUM_ZOO = 7   !< total number of zooplankton groups
   integer, parameter, public :: NUM_BACT = 1  !< total number of bacteria groups
   integer, parameter, public :: NUM_PREY = 13  !< total numbers of prey groups
-  integer, parameter, public :: DIAZO      = 1 !< ID for diazotrophs
-  integer, parameter, public :: LARGE      = 2 !< ID for large phytoplankton
-  integer, parameter, public :: MEDIUM     = 3 !< ID for medium phytoplankton
-  integer, parameter, public :: SMALL      = 4 !< ID for small phytoplankton
+
+  ! Phytoplankton group IDs.  These index the phyto(:) array of type(phytoplankton).
+  integer, parameter, public :: DIAZ       = 1 !< ID for diazotrophs
+  integer, parameter, public :: LGP        = 2 !< ID for large phytoplankton
+  integer, parameter, public :: MDP        = 3 !< ID for medium phytoplankton
+  integer, parameter, public :: SMP        = 4 !< ID for small phytoplankton
 
   ! Zooplankton group IDs.  These index the zoo(:) array of type(zooplankton).  New groups are
   ! appended so that the indices of pre-existing groups are never disturbed; code that needs to
@@ -60,23 +62,23 @@ module cobalt_types
   integer, parameter, public :: SMT        = 6 !< ID for small tunicates (appendicularians)
   integer, parameter, public :: LGT        = 7 !< ID for large tunicates (salps)
 
-  ! Prey IDs.  These index the columns of ipa_matrix/pa_matrix/ingest_matrix and the entries of
-  ! prey_vec.  The ordering is dictated by the ingestion bookkeeping loops, which assume prey are
+  ! Prey array IDs.  These index the columns of ipa_matrix/pa_matrix/ingest_matrix and the entries
+  ! of prey_vec.  The ordering is dictated by the ingestion bookkeeping loops, which assume prey are
   ! ordered phytoplankton, bacteria, zooplankton, then detritus, and that zooplankton group n
   ! occupies prey slot NUM_PHYTO + NUM_BACT + n.
-  integer, parameter, public :: PREY_DIAZO = 1  !< prey slot for diazotrophs
-  integer, parameter, public :: PREY_LARGE = 2  !< prey slot for large phytoplankton
-  integer, parameter, public :: PREY_MEDIUM= 3  !< prey slot for medium phytoplankton
-  integer, parameter, public :: PREY_SMALL = 4  !< prey slot for small phytoplankton
-  integer, parameter, public :: PREY_BACT  = 5  !< prey slot for bacteria
-  integer, parameter, public :: PREY_SMZ   = 6  !< prey slot for small zooplankton
-  integer, parameter, public :: PREY_MDZ   = 7  !< prey slot for medium zooplankton
-  integer, parameter, public :: PREY_LGZ   = 8  !< prey slot for large zooplankton
-  integer, parameter, public :: PREY_VMMDZ = 9  !< prey slot for migrating medium zooplankton
-  integer, parameter, public :: PREY_VMLGZ = 10 !< prey slot for migrating large zooplankton
-  integer, parameter, public :: PREY_SMT   = 11 !< prey slot for small tunicates
-  integer, parameter, public :: PREY_LGT   = 12 !< prey slot for large tunicates
-  integer, parameter, public :: PREY_DET   = 13 !< prey slot for detritus (slow + fast sinking)
+  integer, parameter, public :: PR_DIAZ   = 1  !< prey array ID for diazotrophs
+  integer, parameter, public :: PR_LGP    = 2  !< prey array ID for large phytoplankton
+  integer, parameter, public :: PR_MDP    = 3  !< prey array ID for medium phytoplankton
+  integer, parameter, public :: PR_SMP    = 4  !< prey array ID for small phytoplankton
+  integer, parameter, public :: PR_BACT   = 5  !< prey array ID for bacteria
+  integer, parameter, public :: PR_SMZ    = 6  !< prey array ID for small zooplankton
+  integer, parameter, public :: PR_MDZ    = 7  !< prey array ID for medium zooplankton
+  integer, parameter, public :: PR_LGZ    = 8  !< prey array ID for large zooplankton
+  integer, parameter, public :: PR_VMMDZ  = 9  !< prey array ID for migrating medium zooplankton
+  integer, parameter, public :: PR_VMLGZ  = 10 !< prey array ID for migrating large zooplankton
+  integer, parameter, public :: PR_SMT    = 11 !< prey array ID for small tunicates
+  integer, parameter, public :: PR_LGT    = 12 !< prey array ID for large tunicates
+  integer, parameter, public :: PR_DET    = 13 !< prey array ID for detritus (slow + fast sinking)
 
   real, parameter, public :: sperd = 24.0 * 3600.0    !< number of seconds in a day (sec)
   real, parameter, public :: I_sperd = 1.0/sperd      !< inverse of number of seconds in a day (sec)
