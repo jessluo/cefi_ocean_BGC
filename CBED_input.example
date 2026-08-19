@@ -1,0 +1,137 @@
+! ======================================================================
+! CBED_input -- runtime parameters for the CBED sediment biogeochemistry
+!               model (carbon, benthic ecosystems and diagenesis).
+!
+! Copy this file into your experiment directory as "CBED_input" and add
+! the following group to input.nml:
+!
+!   &cbed_input_nml
+!       parameter_filename = 'CBED_input'
+!   /
+!
+! CBED itself is switched on with do_CBED = .true. in &generic_COBALT_nml.
+! When do_CBED is true this file must exist; an empty file is valid and
+! leaves every parameter at the default shown below.
+!
+! Every value listed here IS the current code default, so a run with this
+! file unmodified reproduces the pre-namelist model. Delete a line to fall
+! back to the code default, or edit it to change the parameter -- no
+! recompilation is needed either way.
+!
+! The model writes CBED_parameter_doc.all and CBED_parameter_doc.short to
+! the run directory; those are the authoritative record of what was used.
+! ======================================================================
+
+! ----------------------------------------------------------------------
+! Control flags
+! ----------------------------------------------------------------------
+
+! Read sediment porosity from a data_override file. If False, the uniform
+! value CBED_POR_CONST is used instead.
+CBED_READ_POROSITY_FROM_FILE = True
+
+! Partition the settling organic matter flux among the three reactivity
+! classes using a power law in bathymetric depth. If False, a fixed
+! 0.70 / 0.20 / 0.10 split is used.
+CBED_USE_DEPTH_DEPENDENT_OM_FRAC = True
+
+! Sub-cycle the sediment reactions so that no tracer is depleted by more
+! than CBED_MAX_DEPLETION_FRAC in any one sub-step.
+CBED_DO_ADAPTIVE_TIME_STEPPING = True
+
+! ----------------------------------------------------------------------
+! Reaction parameters
+! ----------------------------------------------------------------------
+
+! Multiplier on the organic matter decay rate along the denitrification
+! pathway, relative to aerobic respiration [unitless]
+CBED_K_ADJ_DENIT = 0.1
+
+! Multiplier on the organic matter decay rate along the anoxic
+! (sulfate reducing) pathway, relative to aerobic respiration [unitless]
+CBED_K_ADJ_ANOXIA = 0.001
+
+! O2 half saturation constant [mol m-3]. Used both as a limitation term
+! for aerobic respiration and as an inhibition term for the anaerobic
+! pathways.
+CBED_KS_O2 = 0.008
+
+! NO3 half saturation constant [mol m-3]. Used both as a limitation term
+! for denitrification and as an inhibition term for sulfate reduction.
+CBED_KS_NO3 = 0.001
+
+! Second order nitrification rate constant [mol-1 m3 yr-1]
+CBED_K_NOX = 2.0E5
+
+! Second order anammox rate constant [mol-1 m3 yr-1]
+CBED_K_ANA = 1.0E5
+
+! Second order rate constant for re-oxidation of oxygen demand units
+! (ODU, i.e. H2S) [mol-1 m3 yr-1]
+! NOTE: the comment on the original hardcoded declaration read "1e6" while
+! the code computed 1e5. The default preserves the code value, 1e5.
+CBED_K_ODUOX = 1.0E5
+
+! Q10 temperature sensitivity applied to all sediment reaction rates
+! [unitless]
+CBED_Q10 = 1.88
+
+! ----------------------------------------------------------------------
+! Organic matter decay rate coefficients
+!   k = coefficient * (POC flux)**CBED_K_POC_EXPONENT
+! POC flux is in umol C cm-2 yr-1; the resulting k is in yr-1.
+! ----------------------------------------------------------------------
+
+! OM1, the fast reacting class
+CBED_K1_COEF = 0.15
+
+! OM2, the medium reacting class
+CBED_K2_COEF = 0.0015
+
+! OM3, the slow reacting class
+CBED_K3_COEF = 0.00009
+
+! POC flux exponent, shared by OM1, OM2 and OM3 [unitless]
+CBED_K_POC_EXPONENT = 0.85
+
+! ----------------------------------------------------------------------
+! Adaptive time stepping controls
+! (only active when CBED_DO_ADAPTIVE_TIME_STEPPING = True)
+! ----------------------------------------------------------------------
+
+! Tracer concentration below which a tracer is ignored when choosing the
+! number of reaction sub-steps [mol m-3]
+CBED_C_MIN_SUBSTEP = 1.0E-6
+
+! Maximum fraction of a tracer that may be consumed in a single sub-step
+! [unitless]. Smaller values give more sub-steps and a more stable
+! solution at greater cost.
+CBED_MAX_DEPLETION_FRAC = 0.8
+
+! Hard cap on the number of reaction sub-steps per macro time step.
+! May need to be raised where coastal organic matter fluxes are large.
+! On this branch each sub-step runs a full carbonate solve in every sediment
+! layer, so raising this is considerably more expensive than it was before the
+! carbonate system was added.
+CBED_N_SUB_MAX = 10
+
+! ----------------------------------------------------------------------
+! Bioturbation and bioirrigation length scales
+!
+! Both quantities decay as a Gaussian in depth into the sediment,
+! exp(-(z/length scale)**2), away from their seafloor maxima.
+! ----------------------------------------------------------------------
+
+! Bioturbation e-folding length scale [m] (default 8 cm)
+CBED_DB_L = 0.08
+
+! Bioirrigation e-folding length scale [m] (default 1.8 cm)
+CBED_BIOIRRI_L = 0.018
+
+! ----------------------------------------------------------------------
+! Porosity
+! ----------------------------------------------------------------------
+
+! Uniform sediment porosity, used only when CBED_READ_POROSITY_FROM_FILE
+! is False [unitless]. The solid volume fraction is derived as 1 - this.
+CBED_POR_CONST = 0.8
