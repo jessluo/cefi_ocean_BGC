@@ -1241,8 +1241,7 @@ contains
       real :: k_diss_calc, k_diss_arag, k_prec_calc, k_prec_arag
       real, dimension(isc:iec,jsc:jec,nk_cbed) :: cbed_omega_arag, cbed_omega_calc
       real, dimension(isc:iec,jsc:jec,nk_cbed) :: R_diss_calc, R_diss_arag, R_prec_calc, R_prec_arag
-      real, dimension(isc:iec,jsc:jec,nk_cbed) :: htotal_dummy
-      real, dimension(isc:iec,jsc:jec,nk_cbed) :: c_h2s_co2, c_sio4_co2
+      real :: c_dic_co2, c_po4_co2, c_talk_co2, c_nh4_co2, c_ca2_co2, c_h2s_co2, c_sio4_co2, htotal_dummy
 
 
 
@@ -1769,37 +1768,42 @@ contains
                         !------
                         ! 1) call co2calc. get omega. 2) determine n_diss, k_diss etc. 3) write R_diss, R_prec
 
-                        !Used in FMS_co2calc
-                        ! CO2_dope_vec_cbed%isc = i ; CO2_dope_vec_cbed%iec = i
-                        ! CO2_dope_vec_cbed%jsc = j ; CO2_dope_vec_cbed%jec = j
-                        ! CO2_dope_vec_cbed%isd = i ; CO2_dope_vec_cbed%ied = i
-                        ! CO2_dope_vec_cbed%jsd = j ; CO2_dope_vec_cbed%jed = j
 
-                        htotal_dummy(i,j,k) = cobalt%f_htotal(i,j,nk)
-                        c_h2s_co2(i,j,k) = 0.5*c_odu(i,j,k)
-                        c_sio4_co2(i,j,k) = cobalt%f_sio4(i,j,nk) * cobalt%Rho_0
-
+                        htotal_dummy = cobalt%f_htotal(i,j,nk)
+                        
+                        ! Convert mol/m3 -> mol/kg before supplying to FMS_co2calc. 
+                        ! *_co2 are local variables used for this purpose. 
+                        c_dic_co2 = c_dic(i,j,k) / cobalt%Rho_0
+                        c_po4_co2 = c_po4(i,j,k) / cobalt%Rho_0
+                        c_sio4_co2 = cobalt%f_sio4(i,j,nk)     ! comes from cobalt directly. already in mol/kg
+                        c_talk_co2 = c_talk(i,j,k) / cobalt%Rho_0
+                        c_nh4_co2 = c_nh4(i,j,k) / cobalt%Rho_0
+                        c_h2s_co2 = 0.5*c_odu(i,j,k) / cobalt%Rho_0  !approximates H2S. 
+                        c_ca2_co2 = c_ca2(i,j,k) / cobalt%Rho_0
 
 
                         call FMS_co2calc_point(mask=grid_tmask(i,j,nk),&
                            t_in=cobalt%btm_temp(i,j),                  &
                            s_in=cobalt%btm_salt(i,j),                  &
-                           dic_in=c_dic(i,j,k),                        &
-                           pt_in=c_po4(i,j,k),                          &
-                           sit_in=c_sio4_co2(i,j,k),                         &
-                           ta_in=c_talk(i,j,k),                          &
+                           dic_in=c_dic_co2,                        &
+                           pt_in=c_po4_co2,                          &
+                           sit_in=c_sio4_co2,                         &
+                           ta_in=c_talk_co2,                          &
                         !InOut
-                           htotal=htotal_dummy(i,j,k),                       &
+                           htotal=htotal_dummy,                       &
                         !Optional In
                            zt=cobalt%zt(i,j,nk),                          &
-                           nh4_in=c_nh4(i,j,k),                           &
-                           h2s_in=c_h2s_co2(i,j,k),                       &
-                           ca_in=c_ca2(i,j,k),                            &
-                           optCON_in='mol/m3',                            &
+                           nh4_in=c_nh4_co2,                           &
+                           h2s_in=c_h2s_co2,                       &
+                           ca_in=c_ca2_co2,                            &
+                           optCON_in='mol/kg',                            &
                         !OUT
                            omega_arag=cbed%cbed_omega_arag(i,j,k), &
-                           omega_calc=cbed%cbed_omega_calc(i,j,k), &
-                           ph_out=cbed%cbed_ph(i,j,k))
+                           omega_calc=cbed%cbed_omega_calc(i,j,k))
+
+                        ! track cbed_htotal, convert to ph back outside subroutine. 
+                        cbed%cbed_ph(i,j,k) = - LOG10(htotal_dummy)
+                        
 
 
                         ! assign rate constants (RADI) {

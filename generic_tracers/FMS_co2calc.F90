@@ -167,7 +167,7 @@ end subroutine read_mocsy_namelist
 subroutine FMS_co2calc(dope_vec, mask,                      &
                           t_in, s_in, dic_in, pt_in, sit_in, ta_in, htotallo, &
                           htotalhi, htotal, zt, co2star, alpha, pCO2surf, &
-                          co3_ion, omega_arag, omega_calc, ph_out, &
+                          co3_ion, omega_arag, omega_calc, &
                           nh4_in, h2s_in, ca_in, optCON_in)  !{
 
 implicit none
@@ -216,8 +216,7 @@ real, dimension(dope_vec%isd:dope_vec%ied,dope_vec%jsd:dope_vec%jed), &
                                co2star, &
                                co3_ion, &
                                omega_arag, &
-                               omega_calc, &
-                               ph_out
+                               omega_calc
 !
 !       local variables
 !
@@ -334,7 +333,6 @@ real :: conc_scale
         if (present(pCO2surf))  pCO2surf(i,j)  = pco2(1)
         if (present(omega_arag)) omega_arag(i,j) = OmegaA(1)
         if (present(omega_calc)) omega_calc(i,j) = OmegaC(1)
-        if (present(ph_out))     ph_out(i,j)     = ph(1)
 
       else  !}{mask(i,j)=0.0
 
@@ -401,13 +399,12 @@ end subroutine  FMS_co2calc  !}
 !       co3_ion    = Carbonate ion, or CO3-- concentration (mol/kg)
 !       omega_arag = aragonite saturation state (dimensionless)
 !       omega_calc = calcite saturation state (dimensionless)
-!       ph_out     = pH on the total scale
 !
 ! </DESCRIPTION>
 
 subroutine FMS_co2calc_point(mask, t_in, s_in, dic_in, pt_in, sit_in, ta_in, htotallo, &
                              htotalhi, htotal, zt, co2star, alpha, pCO2surf, &
-                             co3_ion, omega_arag, omega_calc, ph_out, &
+                             co3_ion, omega_arag, omega_calc, &
                              nh4_in, h2s_in, ca_in, optCON_in)  !{
 
 implicit none
@@ -451,8 +448,7 @@ real, intent(out), optional :: alpha, &
                                co2star, &
                                co3_ion, &
                                omega_arag, &
-                               omega_calc, &
-                               ph_out
+                               omega_calc
 !
 !       local variables
 !
@@ -558,7 +554,6 @@ real :: conc_scale
     if (present(pCO2surf))  pCO2surf  = pco2(1)
     if (present(omega_arag)) omega_arag = OmegaA(1)
     if (present(omega_calc)) omega_calc = OmegaC(1)
-    if (present(ph_out))     ph_out     = ph(1)
 
   else  !}{mask = 0.0
 
