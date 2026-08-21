@@ -1701,7 +1701,7 @@ contains
          ! Note: This cap can be increased depending on how aggressive the coastal fluxes may get.
          do j = jsc, jec
             do i = isc, iec
-               n_sub(i,j) = min(n_sub(i,j), 1)
+               n_sub(i,j) = min(n_sub(i,j), 10)
                dt_sub(i,j) = dt / real(n_sub(i,j))
             enddo
          enddo
