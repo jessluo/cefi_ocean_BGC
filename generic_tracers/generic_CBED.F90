@@ -7,7 +7,7 @@ module generic_CBED
    use cobalt_types,   only : generic_COBALT_type, phytoplankton, missing_value1, sperd, spery, epsln
    use cobalt_types,   only : SMALL, MEDIUM, LARGE, DIAZO, NUM_PHYTO
    use time_manager_mod,  only: time_type
-   use field_manager_mod, only: fm_string_len, fm_path_name_len
+   use field_manager_mod, only: fm_string_len
    use mpp_domains_mod,  only : domain2D,mpp_define_io_domain
    use data_override_mod, only: data_override
    use fms2_io_mod, only: FmsNetcdfDomainFile_t, open_file, close_file, read_restart, write_restart
@@ -1237,8 +1237,12 @@ contains
       real, dimension(isc:iec,jsc:jec) :: dt_sub
 
       ! carbonate system related variables
+      real :: omega_arag_crit, omega_calc_crit
+      real :: n_diss_arag_gt_crit, n_diss_arag_lt_crit, n_diss_calc_gt_crit, n_diss_calc_lt_crit
       real :: n_diss_calc, n_diss_arag, n_prec_calc
+      real :: k_diss_arag_gt_crit, k_diss_arag_lt_crit, k_diss_calc_gt_crit, k_diss_calc_lt_crit 
       real :: k_diss_calc, k_diss_arag, k_prec_calc, k_prec_arag
+
       real, dimension(isc:iec,jsc:jec,nk_cbed) :: cbed_omega_arag, cbed_omega_calc
       real, dimension(isc:iec,jsc:jec,nk_cbed) :: R_diss_calc, R_diss_arag, R_prec_calc, R_prec_arag
       real :: c_dic_co2, c_po4_co2, c_talk_co2, c_nh4_co2, c_ca2_co2, c_h2s_co2, c_sio4_co2, htotal_dummy
@@ -1697,7 +1701,7 @@ contains
          ! Note: This cap can be increased depending on how aggressive the coastal fluxes may get.
          do j = jsc, jec
             do i = isc, iec
-               n_sub(i,j) = min(n_sub(i,j), 120)
+               n_sub(i,j) = min(n_sub(i,j), 1)
                dt_sub(i,j) = dt / real(n_sub(i,j))
             enddo
          enddo
@@ -1807,35 +1811,55 @@ contains
 
 
                         ! assign rate constants (RADI) {
-                        if (cbed%cbed_omega_arag(i,j,k) >= 0.835 .and. cbed%cbed_omega_arag(i,j,k) < 1.0) then
-                           n_diss_arag = 0.13
-                        else
-                           n_diss_arag = 1.46
-                        endif
+                        omega_arag_crit = 0.835
+                        omega_calc_crit = 0.828
 
-                        if (cbed%cbed_omega_calc(i,j,k) >= 0.828 .and. cbed%cbed_omega_calc(i,j,k) < 1.0) then
-                           n_diss_calc = 0.11
-                        else
-                           n_diss_calc = 4.7
-                        endif
+                        n_diss_arag_gt_crit = 0.13  ! gt = greater than critical
+                        n_diss_arag_lt_crit = 1.46  ! lt = less than critical
+
+                        n_diss_calc_gt_crit = 0.11
+                        n_diss_calc_lt_crit = 4.7
 
                         n_prec_calc = 1.76
 
-                        if (cbed%cbed_omega_arag(i,j,k) >= 0.835 .and. cbed%cbed_omega_arag(i,j,k) < 1.0) then
-                           k_diss_arag = (3.8*10.0**(-3.0))/spery
-                        else
-                           k_diss_arag = (4.2*10.0**(-2.0))/spery
-                        endif
+                        k_diss_arag_gt_crit = (3.8*10.0**(-3.0))  !unit year-1
+                        k_diss_arag_lt_crit = (4.2*10.0**(-2.0))
 
-                        if (cbed%cbed_omega_calc(i,j,k) >= 0.835 .and. cbed%cbed_omega_calc(i,j,k) < 1.0) then
-                           k_diss_calc = (6.3*10.0**(-3.0))/spery
-                        else
-                           k_diss_calc = 20.0 /spery
-                        endif
+                        k_diss_calc_gt_crit = (6.3*10.0**(-3.0))
+                        k_diss_calc_lt_crit = 20.0 
 
-                        k_prec_calc = 0.4/spery
+                        k_prec_calc = 0.4/spery  !unit mol m-3 year-1 converted to mol m-3 s-1
                         k_prec_arag = 0.0
+                        
                         !--RADI--!}
+
+                        ! assign the parameters according to critical saturation state
+                        ! n_diss
+                        if (cbed%cbed_omega_arag(i,j,k) >= omega_arag_crit .and. cbed%cbed_omega_arag(i,j,k) < 1.0) then
+                           n_diss_arag = n_diss_arag_gt_crit
+                        else
+                           n_diss_arag = n_diss_arag_lt_crit
+                        endif
+
+                        if (cbed%cbed_omega_calc(i,j,k) >= omega_calc_crit .and. cbed%cbed_omega_calc(i,j,k) < 1.0) then
+                           n_diss_calc = n_diss_calc_gt_crit
+                        else
+                           n_diss_calc = n_diss_calc_lt_crit
+                        endif
+
+                        ! k_diss
+                        if (cbed%cbed_omega_arag(i,j,k) >= omega_arag_crit .and. cbed%cbed_omega_arag(i,j,k) < 1.0) then
+                           k_diss_arag = k_diss_arag_gt_crit/spery
+                        else
+                           k_diss_arag = k_diss_arag_lt_crit/spery
+                        endif
+
+                        if (cbed%cbed_omega_calc(i,j,k) >= omega_calc_crit .and. cbed%cbed_omega_calc(i,j,k) < 1.0) then
+                           k_diss_calc = k_diss_calc_gt_crit/spery
+                        else
+                           k_diss_calc = k_diss_calc_lt_crit/spery
+                        endif
+
 
                         ! R_diss_calc, R_diss_arag, R_prec_calc, R_prec_arag
 
