@@ -36,8 +36,7 @@ module generic_CBED
       ! ------------------------------------------------------------------
       ! Runtime-configurable parameters.
       ! All of these are set in generic_CBED_add_params from the CBED_input
-      ! file (see cbed_param_doc.F90); the defaults given there reproduce the
-      ! values that were previously hardcoded here and in the routines below.
+      ! file (see cbed_param_doc.F90).
       ! Do NOT give them initializers - get_param supplies the defaults.
       ! ------------------------------------------------------------------
 
@@ -69,7 +68,7 @@ module generic_CBED
       real    :: max_depletion_frac   ! maximum fraction of a tracer that may be consumed in one sub-step
       integer :: n_sub_max            ! hard cap on the number of sub-steps per macro step
 
-      ! Carbonate system (RADI) dissolution and precipitation kinetics
+      ! Carbonate system dissolution and precipitation kinetics
       real :: omega_arag_crit        ! aragonite saturation state separating the two dissolution regimes
       real :: omega_calc_crit        ! calcite saturation state separating the two dissolution regimes
       real :: n_diss_arag_gt_crit    ! aragonite dissolution reaction order at or above omega_arag_crit
@@ -450,8 +449,9 @@ contains
                      "was before the carbonate system was added.", &
                      units="nondim", default=10)
 
-      ! ---------------- Carbonate system (RADI) ----------------
+      ! ---------------- Carbonate system ----------------
       ! Dissolution kinetics switch between two regimes at a critical saturation state.
+	  ! Defaults are currently set to the same values as the RADI model (Sulpis et al. 2022)
       call get_param(param_file, "generic_CBED", "CBED_OMEGA_ARAG_CRIT", cbed%omega_arag_crit, &
                      "Aragonite saturation state separating the near-saturation and "//&
                      "undersaturated dissolution kinetic regimes.", &
@@ -479,8 +479,7 @@ contains
                      "corresponding exponent.", units="unitless", default=1.76)
 
       ! The four dissolution rate constants are held in yr-1 and divided by spery where
-      ! they are used, which is how the original code was written; leaving the division
-      ! at the point of use keeps this exactly answer preserving.
+      ! they are used, TODO: confirm that this is indeed what we want to do
       call get_param(param_file, "generic_CBED", "CBED_K_DISS_ARAG_GT_CRIT", cbed%k_diss_arag_gt_crit, &
                      "Aragonite dissolution rate constant in the near-saturation regime.", &
                      units="yr-1", default=3.8e-3)
@@ -2057,7 +2056,7 @@ contains
                         
 
 
-                        ! The RADI rate constants and reaction orders that used to be
+                        ! The carbonate rate constants and reaction orders that used to be
                         ! assigned here are now runtime configurable and read once in
                         ! generic_CBED_add_params. They were loop invariant, so assigning
                         ! them here re-set them on every i, j, k and sub-step iteration.
