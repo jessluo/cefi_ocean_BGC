@@ -69,6 +69,21 @@ module generic_CBED
       real    :: max_depletion_frac   ! maximum fraction of a tracer that may be consumed in one sub-step
       integer :: n_sub_max            ! hard cap on the number of sub-steps per macro step
 
+      ! Carbonate system (RADI) dissolution and precipitation kinetics
+      real :: omega_arag_crit        ! aragonite saturation state separating the two dissolution regimes
+      real :: omega_calc_crit        ! calcite saturation state separating the two dissolution regimes
+      real :: n_diss_arag_gt_crit    ! aragonite dissolution reaction order at or above omega_arag_crit
+      real :: n_diss_arag_lt_crit    ! aragonite dissolution reaction order below omega_arag_crit
+      real :: n_diss_calc_gt_crit    ! calcite dissolution reaction order at or above omega_calc_crit
+      real :: n_diss_calc_lt_crit    ! calcite dissolution reaction order below omega_calc_crit
+      real :: n_prec_calc            ! calcite precipitation reaction order
+      real :: k_diss_arag_gt_crit    ! aragonite dissolution rate constant at or above omega_arag_crit (yr-1)
+      real :: k_diss_arag_lt_crit    ! aragonite dissolution rate constant below omega_arag_crit (yr-1)
+      real :: k_diss_calc_gt_crit    ! calcite dissolution rate constant at or above omega_calc_crit (yr-1)
+      real :: k_diss_calc_lt_crit    ! calcite dissolution rate constant below omega_calc_crit (yr-1)
+      real :: k_prec_calc            ! calcite precipitation rate constant (mol m-3 s-1, converted from yr-1 on read)
+      real :: k_prec_arag            ! aragonite precipitation rate constant (mol m-3 s-1, converted from yr-1 on read)
+
       ! Bioturbation and bioirrigation length scales
       real :: Db_l              ! bioturbation length scale (m)
       real :: bioirri_l         ! bioirrigation length scale (m)
@@ -434,6 +449,70 @@ contains
                      "sediment layer, so raising this is considerably more expensive than it "//&
                      "was before the carbonate system was added.", &
                      units="nondim", default=10)
+
+      ! ---------------- Carbonate system (RADI) ----------------
+      ! Dissolution kinetics switch between two regimes at a critical saturation state.
+      call get_param(param_file, "generic_CBED", "CBED_OMEGA_ARAG_CRIT", cbed%omega_arag_crit, &
+                     "Aragonite saturation state separating the near-saturation and "//&
+                     "undersaturated dissolution kinetic regimes.", &
+                     units="unitless", default=0.835)
+      call get_param(param_file, "generic_CBED", "CBED_OMEGA_CALC_CRIT", cbed%omega_calc_crit, &
+                     "Calcite saturation state separating the near-saturation and "//&
+                     "undersaturated dissolution kinetic regimes.", &
+                     units="unitless", default=0.828)
+
+      call get_param(param_file, "generic_CBED", "CBED_N_DISS_ARAG_GT_CRIT", cbed%n_diss_arag_gt_crit, &
+                     "Aragonite dissolution reaction order for saturation states at or above "//&
+                     "CBED_OMEGA_ARAG_CRIT and below 1.", units="unitless", default=0.13)
+      call get_param(param_file, "generic_CBED", "CBED_N_DISS_ARAG_LT_CRIT", cbed%n_diss_arag_lt_crit, &
+                     "Aragonite dissolution reaction order for saturation states below "//&
+                     "CBED_OMEGA_ARAG_CRIT.", units="unitless", default=1.46)
+      call get_param(param_file, "generic_CBED", "CBED_N_DISS_CALC_GT_CRIT", cbed%n_diss_calc_gt_crit, &
+                     "Calcite dissolution reaction order for saturation states at or above "//&
+                     "CBED_OMEGA_CALC_CRIT and below 1.", units="unitless", default=0.11)
+      call get_param(param_file, "generic_CBED", "CBED_N_DISS_CALC_LT_CRIT", cbed%n_diss_calc_lt_crit, &
+                     "Calcite dissolution reaction order for saturation states below "//&
+                     "CBED_OMEGA_CALC_CRIT.", units="unitless", default=4.7)
+      call get_param(param_file, "generic_CBED", "CBED_N_PREC_CALC", cbed%n_prec_calc, &
+                     "Calcite precipitation reaction order, the exponent applied to "//&
+                     "(omega_calc - 1). Note the aragonite precipitation rate law has no "//&
+                     "corresponding exponent.", units="unitless", default=1.76)
+
+      ! The four dissolution rate constants are held in yr-1 and divided by spery where
+      ! they are used, which is how the original code was written; leaving the division
+      ! at the point of use keeps this exactly answer preserving.
+      call get_param(param_file, "generic_CBED", "CBED_K_DISS_ARAG_GT_CRIT", cbed%k_diss_arag_gt_crit, &
+                     "Aragonite dissolution rate constant in the near-saturation regime.", &
+                     units="yr-1", default=3.8e-3)
+      call get_param(param_file, "generic_CBED", "CBED_K_DISS_ARAG_LT_CRIT", cbed%k_diss_arag_lt_crit, &
+                     "Aragonite dissolution rate constant in the undersaturated regime.", &
+                     units="yr-1", default=4.2e-2)
+      call get_param(param_file, "generic_CBED", "CBED_K_DISS_CALC_GT_CRIT", cbed%k_diss_calc_gt_crit, &
+                     "Calcite dissolution rate constant in the near-saturation regime.", &
+                     units="yr-1", default=6.3e-3)
+      call get_param(param_file, "generic_CBED", "CBED_K_DISS_CALC_LT_CRIT", cbed%k_diss_calc_lt_crit, &
+                     "Calcite dissolution rate constant in the undersaturated regime.", &
+                     units="yr-1", default=20.0)
+
+      ! The two precipitation rate constants are converted to s-1 here, because that is
+      ! where the original code applied the conversion for calcite.
+      ! TODO: as with CBED_K_NOX above, switch these to get_param's scale=I_spery once
+      ! the first pass is confirmed to reproduce.
+      call get_param(param_file, "generic_CBED", "CBED_K_PREC_CALC", cbed%k_prec_calc, &
+                     "Calcite precipitation rate constant.", &
+                     units="mol m-3 yr-1", default=0.4)
+      cbed%k_prec_calc = cbed%k_prec_calc / spery
+
+      ! NOTE: the original code applied /spery to k_prec_calc but NOT to k_prec_arag, even
+      ! though both are used as s-1 rates. That was harmless only because k_prec_arag was
+      ! hardcoded to zero. Now that it is settable, the conversion is applied to both, so
+      ! that a non-zero value means what the units say. This is exactly answer preserving
+      ! at the default, since 0.0/spery is 0.0.
+      call get_param(param_file, "generic_CBED", "CBED_K_PREC_ARAG", cbed%k_prec_arag, &
+                     "Aragonite precipitation rate constant. Zero disables aragonite "//&
+                     "precipitation, which is the default.", &
+                     units="mol m-3 yr-1", default=0.0)
+      cbed%k_prec_arag = cbed%k_prec_arag / spery
 
       ! ---------------- Bioturbation and bioirrigation length scales ----------------
       call get_param(param_file, "generic_CBED", "CBED_DB_L", cbed%Db_l, &
@@ -1398,12 +1477,11 @@ contains
       integer, dimension(isc:iec,jsc:jec) :: n_sub
       real, dimension(isc:iec,jsc:jec) :: dt_sub
 
-      ! carbonate system related variables
-      real :: omega_arag_crit, omega_calc_crit
-      real :: n_diss_arag_gt_crit, n_diss_arag_lt_crit, n_diss_calc_gt_crit, n_diss_calc_lt_crit
-      real :: n_diss_calc, n_diss_arag, n_prec_calc
-      real :: k_diss_arag_gt_crit, k_diss_arag_lt_crit, k_diss_calc_gt_crit, k_diss_calc_lt_crit 
-      real :: k_diss_calc, k_diss_arag, k_prec_calc, k_prec_arag
+      ! Carbonate system working variables. These hold the reaction order and rate
+      ! constant selected for the current cell according to its saturation state; the
+      ! constants they are selected from are runtime configurable and live in cbed%.
+      real :: n_diss_calc, n_diss_arag
+      real :: k_diss_calc, k_diss_arag
 
       real, dimension(isc:iec,jsc:jec,nk_cbed) :: cbed_omega_arag, cbed_omega_calc
       real, dimension(isc:iec,jsc:jec,nk_cbed) :: R_diss_calc, R_diss_arag, R_prec_calc, R_prec_arag
@@ -1979,54 +2057,36 @@ contains
                         
 
 
-                        ! assign rate constants (RADI) {
-                        omega_arag_crit = 0.835
-                        omega_calc_crit = 0.828
-
-                        n_diss_arag_gt_crit = 0.13  ! gt = greater than critical
-                        n_diss_arag_lt_crit = 1.46  ! lt = less than critical
-
-                        n_diss_calc_gt_crit = 0.11
-                        n_diss_calc_lt_crit = 4.7
-
-                        n_prec_calc = 1.76
-
-                        k_diss_arag_gt_crit = (3.8*10.0**(-3.0))  !unit year-1
-                        k_diss_arag_lt_crit = (4.2*10.0**(-2.0))
-
-                        k_diss_calc_gt_crit = (6.3*10.0**(-3.0))
-                        k_diss_calc_lt_crit = 20.0 
-
-                        k_prec_calc = 0.4/spery  !unit mol m-3 year-1 converted to mol m-3 s-1
-                        k_prec_arag = 0.0
-                        
-                        !--RADI--!}
+                        ! The RADI rate constants and reaction orders that used to be
+                        ! assigned here are now runtime configurable and read once in
+                        ! generic_CBED_add_params. They were loop invariant, so assigning
+                        ! them here re-set them on every i, j, k and sub-step iteration.
 
                         ! assign the parameters according to critical saturation state
                         ! n_diss
-                        if (cbed%cbed_omega_arag(i,j,k) >= omega_arag_crit .and. cbed%cbed_omega_arag(i,j,k) < 1.0) then
-                           n_diss_arag = n_diss_arag_gt_crit
+                        if (cbed%cbed_omega_arag(i,j,k) >= cbed%omega_arag_crit .and. cbed%cbed_omega_arag(i,j,k) < 1.0) then
+                           n_diss_arag = cbed%n_diss_arag_gt_crit
                         else
-                           n_diss_arag = n_diss_arag_lt_crit
+                           n_diss_arag = cbed%n_diss_arag_lt_crit
                         endif
 
-                        if (cbed%cbed_omega_calc(i,j,k) >= omega_calc_crit .and. cbed%cbed_omega_calc(i,j,k) < 1.0) then
-                           n_diss_calc = n_diss_calc_gt_crit
+                        if (cbed%cbed_omega_calc(i,j,k) >= cbed%omega_calc_crit .and. cbed%cbed_omega_calc(i,j,k) < 1.0) then
+                           n_diss_calc = cbed%n_diss_calc_gt_crit
                         else
-                           n_diss_calc = n_diss_calc_lt_crit
+                           n_diss_calc = cbed%n_diss_calc_lt_crit
                         endif
 
                         ! k_diss
-                        if (cbed%cbed_omega_arag(i,j,k) >= omega_arag_crit .and. cbed%cbed_omega_arag(i,j,k) < 1.0) then
-                           k_diss_arag = k_diss_arag_gt_crit/spery
+                        if (cbed%cbed_omega_arag(i,j,k) >= cbed%omega_arag_crit .and. cbed%cbed_omega_arag(i,j,k) < 1.0) then
+                           k_diss_arag = cbed%k_diss_arag_gt_crit/spery
                         else
-                           k_diss_arag = k_diss_arag_lt_crit/spery
+                           k_diss_arag = cbed%k_diss_arag_lt_crit/spery
                         endif
 
-                        if (cbed%cbed_omega_calc(i,j,k) >= omega_calc_crit .and. cbed%cbed_omega_calc(i,j,k) < 1.0) then
-                           k_diss_calc = k_diss_calc_gt_crit/spery
+                        if (cbed%cbed_omega_calc(i,j,k) >= cbed%omega_calc_crit .and. cbed%cbed_omega_calc(i,j,k) < 1.0) then
+                           k_diss_calc = cbed%k_diss_calc_gt_crit/spery
                         else
-                           k_diss_calc = k_diss_calc_lt_crit/spery
+                           k_diss_calc = cbed%k_diss_calc_lt_crit/spery
                         endif
 
 
@@ -2037,7 +2097,7 @@ contains
                            R_prec_arag(i,j,k) = 0.0
                         else
                            R_diss_arag(i,j,k) = 0.0
-                           R_prec_arag(i,j,k) = k_prec_arag * (cbed%cbed_omega_arag(i,j,k) - 1.0)
+                           R_prec_arag(i,j,k) = cbed%k_prec_arag * (cbed%cbed_omega_arag(i,j,k) - 1.0)
                         endif
 
                         if (cbed%cbed_omega_calc(i,j,k) < 1.0) then
@@ -2045,7 +2105,7 @@ contains
                            R_prec_calc(i,j,k) = 0.0
                         else
                            R_diss_calc(i,j,k) = 0.0
-                           R_prec_calc(i,j,k) = k_prec_calc * (cbed%cbed_omega_calc(i,j,k) - 1.0)**n_prec_calc
+                           R_prec_calc(i,j,k) = cbed%k_prec_calc * (cbed%cbed_omega_calc(i,j,k) - 1.0)**cbed%n_prec_calc
                         endif
 
                         !

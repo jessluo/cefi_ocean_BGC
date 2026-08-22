@@ -37,6 +37,12 @@ CBED_USE_DEPTH_DEPENDENT_OM_FRAC = True
 
 ! Sub-cycle the sediment reactions so that no tracer is depleted by more
 ! than CBED_MAX_DEPLETION_FRAC in any one sub-step.
+!
+! WARNING: on this branch the carbonate system is implemented ONLY in the
+! adaptive branch. Setting this to False silently disables all sediment
+! carbonate chemistry -- calcite, aragonite, Ca2+ and PO4 are then never
+! updated and never transported. Leave it True unless you specifically want
+! the pre-carbonate behaviour.
 CBED_DO_ADAPTIVE_TIME_STEPPING = True
 
 ! ----------------------------------------------------------------------
@@ -127,6 +133,46 @@ CBED_DB_L = 0.08
 
 ! Bioirrigation e-folding length scale [m] (default 1.8 cm)
 CBED_BIOIRRI_L = 0.018
+
+! ----------------------------------------------------------------------
+! Carbonate system (RADI) dissolution and precipitation kinetics
+!
+! Dissolution follows
+!     R_diss = Q10_factor * k_diss * C_solid * (1 - omega)**n_diss
+! for omega < 1, where k_diss and n_diss each switch between a
+! near-saturation value (_GT_CRIT, used when omega is at or above the
+! critical value and below 1) and an undersaturated value (_LT_CRIT).
+!
+! Precipitation follows
+!     R_prec_calc = k_prec_calc * (omega_calc - 1)**n_prec_calc
+!     R_prec_arag = k_prec_arag * (omega_arag - 1)
+! for omega > 1. Note the aragonite rate law has NO exponent, unlike
+! calcite, and that aragonite precipitation is disabled by default.
+! ----------------------------------------------------------------------
+
+! Saturation states separating the two dissolution regimes [unitless]
+CBED_OMEGA_ARAG_CRIT = 0.835
+CBED_OMEGA_CALC_CRIT = 0.828
+
+! Dissolution reaction orders [unitless]
+CBED_N_DISS_ARAG_GT_CRIT = 0.13
+CBED_N_DISS_ARAG_LT_CRIT = 1.46
+CBED_N_DISS_CALC_GT_CRIT = 0.11
+CBED_N_DISS_CALC_LT_CRIT = 4.7
+
+! Calcite precipitation reaction order [unitless]
+CBED_N_PREC_CALC = 1.76
+
+! Dissolution rate constants [yr-1]
+CBED_K_DISS_ARAG_GT_CRIT = 3.8E-3
+CBED_K_DISS_ARAG_LT_CRIT = 4.2E-2
+CBED_K_DISS_CALC_GT_CRIT = 6.3E-3
+CBED_K_DISS_CALC_LT_CRIT = 20.0
+
+! Precipitation rate constants [mol m-3 yr-1]
+! CBED_K_PREC_ARAG = 0.0 disables aragonite precipitation.
+CBED_K_PREC_CALC = 0.4
+CBED_K_PREC_ARAG = 0.0
 
 ! ----------------------------------------------------------------------
 ! Porosity
