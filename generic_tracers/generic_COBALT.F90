@@ -161,6 +161,9 @@ module generic_COBALT
   use g_tracer_utils, only : g_send_data, is_root_pe
   use g_tracer_utils, only : g_tracer_is_prog, g_tracer_vertfill, g_tracer_get_next
 
+  use generic_bottom_layer_diags, only: generic_bld, generic_bld_alloc, generic_bld_update
+  use generic_bottom_layer_diags, only: generic_bld_average, generic_bld_dealloc
+
   use cobalt_types
   use cobalt_send_diag, only : cobalt_send_diagnostics
   use cobalt_reg_diag, only : cobalt_reg_diagnostics
@@ -1178,7 +1181,7 @@ contains
     call get_param(param_file, "generic_COBALT", "dvm_I_thresh_lgt", zoo(LGT)%dvm_I_thresh, &
                    "Irradiance threshold for large tunicate DVM", &
                    units="W m-2", default=0.0001)
-   
+
     call get_param(param_file, "generic_COBALT", "swim_max_smz", zoo(SMZ)%swim_max, "Maximum swimming speed for small zooplankton", &
                    units="m s-1", default=0.0)
     call get_param(param_file, "generic_COBALT", "swim_max_mdz", zoo(MDZ)%swim_max, "Maximum swimming speed for medium zooplankton", &
@@ -4030,7 +4033,8 @@ contains
   !     ilb,jlb,tau,dt,grid_dat,model_time,nbands,max_wavelength_band,sw_pen_band,opacity_band,internal_heat,frunoff)
 
     type(g_tracer_type),            pointer    :: tracer_list
-    real, dimension(ilb:,jlb:,:),   intent(in) :: Temp,Salt,rho_dzt,dzt
+    real, dimension(ilb:,jlb:,:),   intent(in) :: Temp,Salt,dzt
+    real, dimension(ilb:,jlb:,:), target, intent(in) :: rho_dzt
     real, dimension(ilb:,jlb:),     intent(in) :: hblt_depth
     integer,                        intent(in) :: ilb,jlb,tau
     real,                           intent(in) :: dt
@@ -4112,13 +4116,14 @@ contains
     real, dimension(:,:),   Allocatable :: neritic_cased_burial
     ! >>
 
-    real, dimension(:,:,:), Allocatable :: ztop, zmid, zbot
-    real, dimension(:,:,:), Allocatable :: pre_totn, net_srcn, post_totn
-    real, dimension(:,:,:), Allocatable :: pre_totp, net_srcp, post_totp
-    real, dimension(:,:,:), Allocatable :: pre_totsi, post_totsi
-    real, dimension(:,:,:), Allocatable :: pre_totfe, net_srcfe, post_totfe
-    real, dimension(:,:,:), Allocatable :: pre_totc, net_srcc, post_totc
+    real, dimension(:,:), Allocatable :: zmid_nk ! z-coordinate at the middle of the last vertical layer
+    real, dimension(:,:,:), Allocatable :: pre_totn, net_srcn
+    real, dimension(:,:,:), Allocatable :: pre_totp, net_srcp
+    real, dimension(:,:,:), Allocatable :: pre_totsi
+    real, dimension(:,:,:), Allocatable :: pre_totfe, net_srcfe
+    real, dimension(:,:,:), Allocatable :: pre_totc, net_srcc
     real, dimension(:,:),   Allocatable :: pka_nh3,phos_nh3_exchange
+    real :: post_totn, post_totp, post_totsi, post_totfe, post_totc
 
     real :: tr,ltr
     real :: imbal
@@ -4139,6 +4144,8 @@ contains
 
     call g_tracer_get_common(isc,iec,jsc,jec,isd,ied,jsd,jed,nk,ntau,&
          grid_tmask=grid_tmask,grid_mask_coast=mask_coast,grid_kmt=grid_kmt)
+
+    call generic_bld_update(cobalt%bld, rho_dzt, grid_kmt)
 
     call mpp_clock_begin(id_clock_carbon_calculations)
     !Get necessary fields
@@ -4164,28 +4171,21 @@ contains
     !
     ! Calculate some thickness/vertical reference points for later calculations
     !
-    allocate(ztop(isc:iec,jsc:jec,1:nk))
-    allocate(zmid(isc:iec,jsc:jec,1:nk))
-    allocate(zbot(isc:iec,jsc:jec,1:nk))
+    allocate(zmid_nk(isc:iec,jsc:jec))
     do j = jsc, jec ; do i = isc, iec   !{
        cobalt%zt(i,j,1) = dzt(i,j,1)
-       ztop(i,j,1) = 0.0
-       zmid(i,j,1) = 0.5*dzt(i,j,1)
-       zbot(i,j,1) = dzt(i,j,1)
     enddo; enddo !} i,j
 
     do k = 2, nk ; do j = jsc, jec ; do i = isc, iec   !{
        cobalt%zt(i,j,k) = cobalt%zt(i,j,k-1) + dzt(i,j,k)
-       ztop(i,j,k) = zbot(i,j,k-1)
-       zmid(i,j,k) = ztop(i,j,k) + 0.5*dzt(i,j,k)
-       zbot(i,j,k) = ztop(i,j,k) + dzt(i,j,k)
     enddo; enddo ; enddo !} i,j,k
+
+    zmid_nk = cobalt%zt(:,:,max(1,nk-1)) + 0.5*dzt(:,:,nk)
 
     !---------------------------------------------------------------------
     !Calculate co3_ion
     !Also calculate co2 fluxes csurf and alpha for the next round of exchange
     !---------------------------------------------------------------------
-
 
     k=1
     do j = jsc, jec ; do i = isc, iec  !{
@@ -4639,7 +4639,7 @@ contains
              ! Issue: This code currently includes an option to increase opacity in shallow/fresh
              ! water.  This should be moved to a namelist (and eventually replaced with a more
              ! robust coastal optics model with full feedbacks to the physics)
-             if ((zmid(i,j,nk).le.cobalt%case2_depth).or.(Salt(i,j,k).le.cobalt%case2_salt)) then
+             if ((zmid_nk(i,j).le.cobalt%case2_depth).or.(Salt(i,j,k).le.cobalt%case2_salt)) then
                tmp_opacity = opacity_band(nb,i,j,k) + cobalt%case2_opac_add
              else
                tmp_opacity = opacity_band(nb,i,j,k)
@@ -4702,6 +4702,7 @@ contains
     enddo;  enddo !} i,j
 
     deallocate(tmp_irr_band)
+    deallocate(zmid_nk)
     !
     ! Calculate the final photoacclimation irradiance using the standard relaxation
     ! scheme (I_aclm(t+1) = I_aclm(t) + (I*(24/daylength)-I_aclm(t))*gamma*dt).
@@ -5270,7 +5271,7 @@ contains
 
        ! Calculate the temperature and oxygen limitations for zooplankton feeding and growth
        ! Since zooplankton ingestion uses oxygen, there is no zooplankton feeding when f_o2 is less than o2_min.
-       do m = 1,NUM_ZOO  !{
+       do m = 1, NUM_ZOO  !{
           zoo(m)%temp_lim(i,j,k) = exp(zoo(m)%ktemp*Temp(i,j,k))
           zoo(m)%o2lim(i,j,k) = max((cobalt%f_o2(i,j,k) - cobalt%o2_min),0.0)/ &
                                 (cobalt%k_o2 + max(cobalt%f_o2(i,j,k)-cobalt%o2_min,0.0))
@@ -5360,6 +5361,8 @@ contains
                                   ingest_matrix(m,PR_SMP)*prey_fe2n_vec(PR_SMP)
        zoo(m)%jingest_sio2(i,j,k) = ingest_matrix(m,PR_MDP)*prey_si2n_vec(PR_MDP)
 
+       ! Medium zooplankton consuming diazotrophs (PR_DIAZ), large phytoplankton (PR_LGP), medium phytoplankton (PR_MDP),
+       ! small phytoplankton (PR_SMP), and small zooplankton (PR_SMZ).  Switching occurs between herbivory and carnivory.
        !
        ! Medium zooplankton (m = MDZ) consuming diazotrophs, large, medium and small phytoplankton, small zooplankton and both
        ! tunicate groups.
@@ -5438,6 +5441,9 @@ contains
        zoo(m)%jingest_sio2(i,j,k) = ingest_matrix(m,PR_LGP)*prey_si2n_vec(PR_LGP) + &
                                     ingest_matrix(m,PR_MDP)*prey_si2n_vec(PR_MDP)
 
+       ! Medium migrating zooplankton (m = VMMDZ) consuming diazotrophs (PR_DIAZ), large phytoplankton (PR_LGP),
+       ! medium phytoplankton (PR_MDP), small phytoplankton (PR_SMP), and small zooplankton (PR_SMZ).  Switching
+       ! occurs between herbivory and carnivory.
        !
        ! Large zooplankton (m = LGZ) consuming diazotrophs, large and medium phytoplankton, medium zooplankton (resident and
        ! migrating) and
@@ -5800,12 +5806,11 @@ contains
 
        ! Calculate assimilation efficiency.
        ! Allows for AE to vary between max and min values with a michaelis-menten functional form
-       
+
        do m = 1,NUM_ZOO
           zoo(m)%assim_eff(i,j,k) = zoo(m)%assim_eff_max - ((zoo(m)%assim_eff_max - zoo(m)%assim_eff_min) * &
                                  (tot_prey(m)/(zoo(m)%kae + tot_prey(m))))
        enddo
-
        !
        ! calculate losses of each prey type to zooplankton, starting with phytoplankton
        !
@@ -5888,7 +5893,6 @@ contains
        cobalt%hp_vis_lim(i,j,k) = (1.0 - cobalt%hp_phi_vis) + cobalt%hp_phi_vis * cobalt%irr_inst(i,j,k) / &
                                   (cobalt%irr_inst(i,j,k) + cobalt%kirr_hp * cobalt%ki_hp / &
                                   (cobalt%ki_hp + tot_prey_hp + epsln) + epsln)
-      
        ! calculate the rate at which large zooplankton ingests each prey type.  The default assumption for higher
        ! predators is that the biomass of higher predators scales in proportion to the available prey.  That is,
        ! it is implicitly assumed that fish biomass is proportional to tot_prey_hp.  For example, the ingestion of
@@ -6692,7 +6696,7 @@ contains
        ! Calculate remineralization under aerobic remineralization
        if (cobalt%f_o2(i,j,k) .gt. cobalt%o2_min) then  !{
           cobalt%jremin_ndet(i,j,k) = cobalt%gamma_ndet * cobalt%expkreminT(i,j,k) * &
-               zbot(i,j,k)/(zbot(i,j,k) + cobalt%remin_ramp_scale) * cobalt%f_o2(i,j,k) / &
+               cobalt%zt(i,j,k)/(cobalt%zt(i,j,k) + cobalt%remin_ramp_scale) * cobalt%f_o2(i,j,k) / &
                ( cobalt%k_o2 + cobalt%f_o2(i,j,k) )*max( 0.0, cobalt%f_ndet(i,j,k) - &
                cobalt%rpcaco3*(cobalt%f_cadet_arag(i,j,k) + cobalt%f_cadet_calc(i,j,k)) - &
                cobalt%rplith*cobalt%f_lithdet(i,j,k) - cobalt%rpsio2*cobalt%f_sidet(i,j,k) )
@@ -6876,14 +6880,12 @@ contains
        endif !}
     enddo; enddo  !} i,j
 
-    ! Calculate the bottom conditions and the fluxes to the bottom for diagnostics and benthic flux calculations.
-    ! MOM4/5 used the bottom grid cell, but MOM6 often has a number of vanishingly thin layers overlying the bottom.
-    ! Grid scale noise in these layers can occur, particularly for quantities with large bottom fluxes.  COBALT thus
-    ! uses conditions over a specified bottom layer thickness (cobalt%bottom_thickness, default = 1m) for bottom calcs.
-
-    ! Local variables used to determine the layers falling within the bottom thickness
-    allocate(rho_dzt_bot(isc:iec,jsc:jec))
-    allocate(k_bot(isc:iec,jsc:jec))
+    ! The following bottom averages need to be calculated now because they're used in other calculations.
+    ! All other bottom averages should be calculated in cobalt_send_diagnostics.
+    call generic_bld_average(cobalt%bld, cobalt%f_o2, cobalt%btm_o2)
+    call generic_bld_average(cobalt%bld, cobalt%f_no3, cobalt%btm_no3)
+    call generic_bld_average(cobalt%bld, cobalt%f_co3_ion, cobalt%btm_co3_ion)
+    call generic_bld_average(cobalt%bld, cobalt%co3_sol_calc, cobalt%btm_co3_sol_calc)
 
     do j = jsc, jec; do i = isc, iec  !{
        if (grid_kmt(i,j) .gt. 0) then !{
@@ -6899,39 +6901,6 @@ contains
           cobalt%fsitot_btm(i,j) = cobalt%f_sidet_btf(i,j,1) + cobalt%f_silg_btf(i,j,1) + &
             cobalt%f_simd_btf(i,j,1)
 
-          ! Calculate the values of tracers influencing the sedimentary transformations
-          ! and fluxes over a layer defined by "bottom_thickess".
-          rho_dzt_bot(i,j) = 0.0
-          cobalt%btm_o2(i,j) = 0.0
-          cobalt%btm_no3(i,j) = 0.0
-          cobalt%btm_co3_sol_calc(i,j) = 0.0
-          cobalt%btm_co3_ion(i,j) = 0.0
-          cobalt%btm_omega_calc(i,j) = 0.0
-          k_bot(i,j) = 0
-          ! Note that grid_kmt is always the total number of layers in MOM6
-          do k = grid_kmt(i,j),1,-1   !{
-            ! Check if the top of layer k is within the bottom thickness.  If so, include its properties in the bottom
-            ! layer averages.  Overshoots will be subtracted off later.
-            if (rho_dzt_bot(i,j).lt.(cobalt%Rho_0*cobalt%bottom_thickness)) then
-              k_bot(i,j) = k
-              rho_dzt_bot(i,j) = rho_dzt_bot(i,j) + rho_dzt(i,j,k)
-              cobalt%btm_o2(i,j) = cobalt%btm_o2(i,j) + cobalt%f_o2(i,j,k)*rho_dzt(i,j,k)
-              cobalt%btm_no3(i,j) = cobalt%btm_no3(i,j) + cobalt%f_no3(i,j,k)*rho_dzt(i,j,k)
-              cobalt%btm_co3_sol_calc(i,j) = cobalt%btm_co3_sol_calc(i,j) + cobalt%co3_sol_calc(i,j,k)*rho_dzt(i,j,k)
-              cobalt%btm_co3_ion(i,j) = cobalt%btm_co3_ion(i,j) + cobalt%f_co3_ion(i,j,k)*rho_dzt(i,j,k)
-            endif
-          enddo
-          ! Subtract off overshoot
-          drho_dzt = rho_dzt_bot(i,j) - cobalt%Rho_0*cobalt%bottom_thickness
-          cobalt%btm_o2(i,j)=cobalt%btm_o2(i,j)-cobalt%f_o2(i,j,k_bot(i,j))*drho_dzt
-          cobalt%btm_no3(i,j)=cobalt%btm_no3(i,j)-cobalt%f_no3(i,j,k_bot(i,j))*drho_dzt
-          cobalt%btm_co3_sol_calc(i,j)=cobalt%btm_co3_sol_calc(i,j)-cobalt%co3_sol_calc(i,j,k_bot(i,j))*drho_dzt
-          cobalt%btm_co3_ion(i,j)=cobalt%btm_co3_ion(i,j)-cobalt%f_co3_ion(i,j,k_bot(i,j))*drho_dzt
-          ! convert back to moles kg-1
-          cobalt%btm_o2(i,j)=cobalt%btm_o2(i,j)/(cobalt%bottom_thickness*cobalt%Rho_0)
-          cobalt%btm_no3(i,j)=cobalt%btm_no3(i,j)/(cobalt%bottom_thickness*cobalt%Rho_0)
-          cobalt%btm_co3_sol_calc(i,j)=cobalt%btm_co3_sol_calc(i,j)/(cobalt%bottom_thickness*cobalt%Rho_0)
-          cobalt%btm_co3_ion(i,j)=cobalt%btm_co3_ion(i,j)/(cobalt%bottom_thickness*cobalt%Rho_0)
           ! calculate the saturation state with respect to calcite for subsequent calculations
           cobalt%btm_omega_calc(i,j)=cobalt%btm_co3_ion(i,j)/cobalt%btm_co3_sol_calc(i,j)
 
@@ -7176,8 +7145,6 @@ contains
 
        endif !}
     enddo; enddo  !} i, j
-    deallocate(rho_dzt_bot)
-    deallocate(k_bot)
 
     do k = 2, nk ; do j = jsc, jec ; do i = isc, iec   !{
        cobalt%f_cased(i,j,k) = 0.0
@@ -7957,15 +7924,14 @@ contains
     ! day-1, so an imbalance of order 1 would be very large whereas 1e-9 is very small.
     ! A reccomended tolerance is between 1e-7 and 1e-9.
     imbal_flag = 0;
-    stdoutunit = stdout();
-    allocate(post_totn(isc:iec,jsc:jec,1:nk))
-    allocate(post_totc(isc:iec,jsc:jec,1:nk))
-    allocate(post_totp(isc:iec,jsc:jec,1:nk))
-    allocate(post_totsi(isc:iec,jsc:jec,1:nk))
-    allocate(post_totfe(isc:iec,jsc:jec,1:nk))
+    post_totn = 0;
+    post_totc = 0;
+    post_totp = 0;
+    post_totsi = 0;
+    post_totfe = 0;
     do k = 1, nk ; do j = jsc, jec ; do i = isc, iec  !{
       if (dzt(i,j,k).gt.cobalt%min_thickness) then
-         post_totn(i,j,k) = (cobalt%p_no3(i,j,k,tau) + cobalt%p_nh4(i,j,k,tau) + &
+         post_totn = (cobalt%p_no3(i,j,k,tau) + cobalt%p_nh4(i,j,k,tau) + &
                     cobalt%p_ndi(i,j,k,tau) + cobalt%p_nlg(i,j,k,tau) + cobalt%p_nmd(i,j,k,tau) + &
                     cobalt%p_nsm(i,j,k,tau) + cobalt%p_nbact(i,j,k,tau) + &
                     cobalt%p_ldon(i,j,k,tau) + cobalt%p_sldon(i,j,k,tau) + &
@@ -7978,13 +7944,13 @@ contains
                     cobalt%p_nvmlgz_met(i,j,k,tau) + &
                     cobalt%p_nsmt(i,j,k,tau)        + cobalt%p_nlgt(i,j,k,tau) + &
                     cobalt%p_nlgt_gut(i,j,k,tau)    + cobalt%p_nlgt_met(i,j,k,tau))*grid_tmask(i,j,k)
-         imbal = (post_totn(i,j,k) - pre_totn(i,j,k) - net_srcn(i,j,k))*86400.0/dt*1.03e6
+         imbal = (post_totn - pre_totn(i,j,k) - net_srcn(i,j,k))*86400.0/dt*1.03e6
          if (abs(imbal).gt.imbalance_tolerance) then
            call mpp_error(FATAL,&
            '==>biological source/sink imbalance (generic_COBALT_update_from_source): Nitrogen')
          endif
 
-         post_totc(i,j,k) = (cobalt%p_dic(i,j,k,tau) + &
+         post_totc = (cobalt%p_dic(i,j,k,tau) + &
                     cobalt%p_cadet_arag(i,j,k,tau) + cobalt%p_cadet_calc(i,j,k,tau) + &
                     cobalt%c_2_n*(cobalt%p_ndi(i,j,k,tau) + cobalt%p_nlg(i,j,k,tau) + &
                     cobalt%p_nmd(i,j,k,tau) + cobalt%p_nsm(i,j,k,tau) + cobalt%p_nbact(i,j,k,tau) + &
@@ -7998,13 +7964,13 @@ contains
                     cobalt%p_nvmlgz_met(i,j,k,tau) + &
                     cobalt%p_nsmt(i,j,k,tau)        + cobalt%p_nlgt(i,j,k,tau) + &
                     cobalt%p_nlgt_gut(i,j,k,tau)    + cobalt%p_nlgt_met(i,j,k,tau)))*grid_tmask(i,j,k)
-        imbal = (post_totc(i,j,k) - pre_totc(i,j,k) - net_srcc(i,j,k))*86400.0/dt*1.03e6
+        imbal = (post_totc - pre_totc(i,j,k) - net_srcc(i,j,k))*86400.0/dt*1.03e6
          if (abs(imbal).gt.imbalance_tolerance) then
            call mpp_error(FATAL,&
            '==>biological source/sink imbalance (generic_COBALT_update_from_source): Carbon')
          endif
 
-         post_totp(i,j,k) = (cobalt%p_po4(i,j,k,tau) + cobalt%p_pdi(i,j,k,tau) + &
+         post_totp = (cobalt%p_po4(i,j,k,tau) + cobalt%p_pdi(i,j,k,tau) + &
                     cobalt%p_plg(i,j,k,tau) + cobalt%p_pmd(i,j,k,tau) + cobalt%p_psm(i,j,k,tau) + &
                     cobalt%p_ldop(i,j,k,tau) + cobalt%p_sldop(i,j,k,tau) + &
                     cobalt%p_srdop(i,j,k,tau) + cobalt%p_pdet(i,j,k,tau) + &
@@ -8023,34 +7989,45 @@ contains
                     cobalt%p_plgt_gut(i,j,k,tau) + &
                     cobalt%p_nlgt_met(i,j,k,tau)*zoo(LGT)%q_p_2_n + &
                     bact(1)%q_p_2_n*cobalt%p_nbact(i,j,k,tau))*grid_tmask(i,j,k)
-         imbal = (post_totp(i,j,k) - pre_totp(i,j,k) - net_srcp(i,j,k))*86400.0/dt*1.03e6
+         imbal = (post_totp - pre_totp(i,j,k) - net_srcp(i,j,k))*86400.0/dt*1.03e6
          if (abs(imbal).gt.imbalance_tolerance) then
            call mpp_error(FATAL,&
            '==>biological source/sink imbalance (generic_COBALT_update_from_source): Phosphorus')
          endif
 
-         post_totfe(i,j,k) = (cobalt%p_fed(i,j,k,tau) + cobalt%p_fedi(i,j,k,tau) + &
+         post_totfe = (cobalt%p_fed(i,j,k,tau) + cobalt%p_fedi(i,j,k,tau) + &
                     cobalt%p_felg(i,j,k,tau) + cobalt%p_femd(i,j,k,tau) + cobalt%p_fesm(i,j,k,tau) + &
                     cobalt%p_fevmmdz_gut(i,j,k,tau) + cobalt%p_fevmlgz_gut(i,j,k,tau) + &
                     cobalt%p_felgt_gut(i,j,k,tau) + &
                     cobalt%p_fedet(i,j,k,tau) + cobalt%p_fedet_fast(i,j,k,tau))*grid_tmask(i,j,k)
-         imbal = (post_totfe(i,j,k) - pre_totfe(i,j,k) - net_srcfe(i,j,k))*86400.0/dt*1.03e6
+         imbal = (post_totfe - pre_totfe(i,j,k) - net_srcfe(i,j,k))*86400.0/dt*1.03e6
          if (abs(imbal).gt.imbalance_tolerance) then
            call mpp_error(FATAL,&
            '==>biological source/sink imbalance (generic_COBALT_update_from_source): Iron')
          endif
 
-         post_totsi(i,j,k) = (cobalt%p_sio4(i,j,k,tau) + cobalt%p_silg(i,j,k,tau) + &
+         post_totsi = (cobalt%p_sio4(i,j,k,tau) + cobalt%p_silg(i,j,k,tau) + &
                     cobalt%p_sivmmdz_gut(i,j,k,tau) + cobalt%p_sivmlgz_gut(i,j,k,tau) + &
                     cobalt%p_silgt_gut(i,j,k,tau) + &
                     cobalt%p_simd(i,j,k,tau) + cobalt%p_sidet(i,j,k,tau))*grid_tmask(i,j,k)
-         imbal = (post_totsi(i,j,k) - pre_totsi(i,j,k))*86400.0/dt*1.03e6
+         imbal = (post_totsi - pre_totsi(i,j,k))*86400.0/dt*1.03e6
          if (abs(imbal).gt.imbalance_tolerance) then
            call mpp_error(FATAL,&
            '==>biological source/sink imbalance (generic_COBALT_update_from_source): Silica')
          endif
       endif
     enddo; enddo ; enddo  !} i,j,k
+
+    ! Deallocate total nutrient arrays:
+    deallocate(pre_totn)
+    deallocate(pre_totc)
+    deallocate(net_srcn)
+    deallocate(net_srcp)
+    deallocate(net_srcc)
+    deallocate(pre_totp)
+    deallocate(pre_totfe)
+    deallocate(net_srcfe)
+    deallocate(pre_totsi)
 
     !
     !----------------
@@ -8595,6 +8572,9 @@ contains
                    rho_dzt(i,j,k)
                 zoo(n)%jprod_don_100(i,j) = zoo(n)%jprod_don_100(i,j) + (zoo(n)%jprod_ldon(i,j,k) + &
                    zoo(n)%jprod_sldon(i,j,k) + zoo(n)%jprod_srdon(i,j,k))*rho_dzt(i,j,k)
+             enddo !} n
+
+             do n = MDZ,VMLGZ !{
                 zoo(n)%jhploss_n_100(i,j) = zoo(n)%jhploss_n_100(i,j) + zoo(n)%jhploss_n(i,j,k)* &
                    rho_dzt(i,j,k)
                 zoo(n)%jprod_ndet_100(i,j) = zoo(n)%jprod_ndet_100(i,j) + zoo(n)%jprod_ndet(i,j,k)* &
@@ -8681,6 +8661,9 @@ contains
                  drho_dzt
                zoo(n)%jprod_don_100(i,j) = zoo(n)%jprod_don_100(i,j) + (zoo(n)%jprod_ldon(i,j,k_100) + &
                  zoo(n)%jprod_sldon(i,j,k_100) + zoo(n)%jprod_srdon(i,j,k_100))*drho_dzt
+           enddo !} n
+
+           do n = MDZ,VMLGZ !{
                zoo(n)%jhploss_n_100(i,j) = zoo(n)%jhploss_n_100(i,j) + zoo(n)%jhploss_n(i,j,k_100)* &
                  drho_dzt
                zoo(n)%jprod_ndet_100(i,j) = zoo(n)%jprod_ndet_100(i,j) + zoo(n)%jprod_ndet(i,j,k_100)* &
@@ -8832,8 +8815,8 @@ contains
              cobalt%jprod_tunicate_200(i,j) = cobalt%jprod_tunicate_200(i,j) + &
                 (zoo(SMT)%jprod_n(i,j,k) + zoo(LGT)%jprod_n(i,j,k))*rho_dzt(i,j,k)
              cobalt%jprod_allphytos_200(i,j) = cobalt%jprod_allphytos_200(i,j) + &
-                 (phyto(1)%jprod_n(i,j,k) + phyto(2)%jprod_n(i,j,k) + &
-                 phyto(3)%jprod_n(i,j,k) + phyto(4)%jprod_n(i,j,k))*rho_dzt(i,j,k);
+                 (phyto(DIAZ)%jprod_n(i,j,k) + phyto(LGP)%jprod_n(i,j,k) + &
+                 phyto(MDP)%jprod_n(i,j,k) + phyto(SMP)%jprod_n(i,j,k))*rho_dzt(i,j,k);
           endif
        enddo  !} k
 
@@ -8845,8 +8828,8 @@ contains
           cobalt%jprod_tunicate_200(i,j) = cobalt%jprod_tunicate_200(i,j) + &
               (zoo(SMT)%jprod_n(i,j,k_200) + zoo(LGT)%jprod_n(i,j,k_200))*drho_dzt
           cobalt%jprod_allphytos_200(i,j) = cobalt%jprod_allphytos_200(i,j) + &
-               (phyto(1)%jprod_n(i,j,k_200) + phyto(2)%jprod_n(i,j,k_200) + &
-               phyto(3)%jprod_n(i,j,k_200) + phyto(4)%jprod_n(i,j,k_200))*drho_dzt
+               (phyto(DIAZ)%jprod_n(i,j,k_200) + phyto(LGP)%jprod_n(i,j,k_200) + &
+               phyto(MDP)%jprod_n(i,j,k_200) + phyto(SMP)%jprod_n(i,j,k_200))*drho_dzt
        endif
     enddo ; enddo  !} i,j
     deallocate(rho_dzt_200)
@@ -9324,6 +9307,8 @@ contains
     integer :: isc,iec,jsc,jec,isd,ied,jsd,jed,nk,ntau,n
 
     call g_tracer_get_common(isc,iec,jsc,jec,isd,ied,jsd,jed,nk,ntau)
+
+    call generic_bld_alloc(cobalt%bld, isc, iec, jsc, jec, cobalt%Rho_0, cobalt%bottom_thickness)
 
     !Allocate all the private arrays.
 
@@ -10007,6 +9992,7 @@ contains
   subroutine user_deallocate_arrays
     integer n
 
+    call generic_bld_dealloc(cobalt%bld)
     deallocate(cobalt%htotalhi,cobalt%htotallo)
 
     do n = 1, NUM_PHYTO
