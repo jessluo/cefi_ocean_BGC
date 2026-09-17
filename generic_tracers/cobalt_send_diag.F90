@@ -389,6 +389,9 @@ module COBALT_send_diag
           used = g_send_data(cobalt%id_ffedet_tp, cobalt%p_fedet(:,:,:,tau) * cobalt%Rho_0 * &
             cobalt%wsink * grid_tmask(:,:,:), model_time, rmask = grid_tmask, &
             is_in=isc, js_in=jsc, ks_in=1,ie_in=iec, je_in=jec, ke_in=nk)
+          used = g_send_data(cobalt%id_ffedet_fast_tp, cobalt%p_fedet_fast(:,:,:,tau) * cobalt%Rho_0 * &
+            cobalt%wsink_fast * grid_tmask(:,:,:), model_time, rmask = grid_tmask, &
+            is_in=isc, js_in=jsc, ks_in=1,ie_in=iec, je_in=jec, ke_in=nk)
           used = g_send_data(cobalt%id_flithdet_tp,      cobalt%p_lithdet(:,:,:,tau) * cobalt%Rho_0 * &
             cobalt%wsink * grid_tmask(:,:,:), model_time, rmask = grid_tmask, &
             is_in=isc, js_in=jsc, ks_in=1,ie_in=iec, je_in=jec, ke_in=nk)
@@ -630,9 +633,9 @@ module COBALT_send_diag
             cobalt%f_po4_int_100(i,j) = cobalt%p_po4(i,j,1,tau) * rho_dzt(i,j,1)
             cobalt%f_sio4_int_100(i,j) = cobalt%p_sio4(i,j,1,tau) * rho_dzt(i,j,1)
             phyto(DIAZ)%f_n_100(i,j) = cobalt%p_ndi(i,j,1,tau) * rho_dzt(i,j,1)
-            phyto(LGP)%f_n_100(i,j) = cobalt%p_nlg(i,j,1,tau) * rho_dzt(i,j,1)
-            phyto(MDP)%f_n_100(i,j) = cobalt%p_nmd(i,j,1,tau) * rho_dzt(i,j,1)
-            phyto(SMP)%f_n_100(i,j) = cobalt%p_nsm(i,j,1,tau) * rho_dzt(i,j,1)
+            phyto(LGP)%f_n_100(i,j)  = cobalt%p_nlg(i,j,1,tau) * rho_dzt(i,j,1)
+            phyto(MDP)%f_n_100(i,j)  = cobalt%p_nmd(i,j,1,tau) * rho_dzt(i,j,1)
+            phyto(SMP)%f_n_100(i,j)  = cobalt%p_nsm(i,j,1,tau) * rho_dzt(i,j,1)
             zoo(SMZ)%f_n_100(i,j) = cobalt%p_nsmz(i,j,1,tau) * rho_dzt(i,j,1)
             zoo(MDZ)%f_n_100(i,j) = cobalt%p_nmdz(i,j,1,tau) * rho_dzt(i,j,1)
             zoo(LGZ)%f_n_100(i,j) = cobalt%p_nlgz(i,j,1,tau) * rho_dzt(i,j,1)
@@ -692,9 +695,9 @@ module COBALT_send_diag
                 cobalt%f_po4_int_100(i,j) = cobalt%f_po4_int_100(i,j) + cobalt%p_po4(i,j,k,tau) * rho_dzt(i,j,k)
                 cobalt%f_sio4_int_100(i,j) = cobalt%f_sio4_int_100(i,j) + cobalt%p_sio4(i,j,k,tau) *  rho_dzt(i,j,k)
                 phyto(DIAZ)%f_n_100(i,j) = phyto(DIAZ)%f_n_100(i,j) + cobalt%p_ndi(i,j,k,tau) * rho_dzt(i,j,k)
-                phyto(LGP)%f_n_100(i,j) = phyto(LGP)%f_n_100(i,j) + cobalt%p_nlg(i,j,k,tau) * rho_dzt(i,j,k)
-                phyto(MDP)%f_n_100(i,j) = phyto(MDP)%f_n_100(i,j) + cobalt%p_nmd(i,j,k,tau) * rho_dzt(i,j,k)
-                phyto(SMP)%f_n_100(i,j) = phyto(SMP)%f_n_100(i,j) + cobalt%p_nsm(i,j,k,tau) * rho_dzt(i,j,k)
+                phyto(LGP)%f_n_100(i,j)  = phyto(LGP)%f_n_100(i,j) + cobalt%p_nlg(i,j,k,tau) * rho_dzt(i,j,k)
+                phyto(MDP)%f_n_100(i,j)  = phyto(MDP)%f_n_100(i,j) + cobalt%p_nmd(i,j,k,tau) * rho_dzt(i,j,k)
+                phyto(SMP)%f_n_100(i,j)  = phyto(SMP)%f_n_100(i,j) + cobalt%p_nsm(i,j,k,tau) * rho_dzt(i,j,k)
                 zoo(SMZ)%f_n_100(i,j) = zoo(SMZ)%f_n_100(i,j) + cobalt%p_nsmz(i,j,k,tau) * rho_dzt(i,j,k)
                 zoo(MDZ)%f_n_100(i,j) = zoo(MDZ)%f_n_100(i,j) + cobalt%p_nmdz(i,j,k,tau) * rho_dzt(i,j,k)
                 zoo(LGZ)%f_n_100(i,j) = zoo(LGZ)%f_n_100(i,j) + cobalt%p_nlgz(i,j,k,tau) * rho_dzt(i,j,k)
@@ -750,9 +753,9 @@ module COBALT_send_diag
               cobalt%f_po4_int_100(i,j) = cobalt%f_po4_int_100(i,j) + cobalt%p_po4(i,j,k_100,tau) * drho_dzt
               cobalt%f_sio4_int_100(i,j) = cobalt%f_sio4_int_100(i,j) + cobalt%p_sio4(i,j,k_100,tau) * drho_dzt
               phyto(DIAZ)%f_n_100(i,j) = phyto(DIAZ)%f_n_100(i,j) + cobalt%p_ndi(i,j,k_100,tau) * drho_dzt
-              phyto(LGP)%f_n_100(i,j) = phyto(LGP)%f_n_100(i,j) + cobalt%p_nlg(i,j,k_100,tau) * drho_dzt
-              phyto(MDP)%f_n_100(i,j) = phyto(MDP)%f_n_100(i,j) + cobalt%p_nmd(i,j,k_100,tau) * drho_dzt
-              phyto(SMP)%f_n_100(i,j) = phyto(SMP)%f_n_100(i,j) + cobalt%p_nsm(i,j,k_100,tau) * drho_dzt
+              phyto(LGP)%f_n_100(i,j)  = phyto(LGP)%f_n_100(i,j) + cobalt%p_nlg(i,j,k_100,tau) * drho_dzt
+              phyto(MDP)%f_n_100(i,j)  = phyto(MDP)%f_n_100(i,j) + cobalt%p_nmd(i,j,k_100,tau) * drho_dzt
+              phyto(SMP)%f_n_100(i,j)  = phyto(SMP)%f_n_100(i,j) + cobalt%p_nsm(i,j,k_100,tau) * drho_dzt
               zoo(SMZ)%f_n_100(i,j) = zoo(SMZ)%f_n_100(i,j) + cobalt%p_nsmz(i,j,k_100,tau) * drho_dzt
               zoo(MDZ)%f_n_100(i,j) = zoo(MDZ)%f_n_100(i,j) + cobalt%p_nmdz(i,j,k_100,tau) * drho_dzt
               zoo(LGZ)%f_n_100(i,j) = zoo(LGZ)%f_n_100(i,j) + cobalt%p_nlgz(i,j,k_100,tau) * drho_dzt
@@ -825,6 +828,8 @@ module COBALT_send_diag
             model_time, rmask = grid_tmask(:,:,1), is_in=isc, js_in=jsc, ie_in=iec, je_in=jec)
           used = g_send_data(cobalt%id_f_mesozoo_200, cobalt%f_mesozoo_200,         &
             model_time, rmask = grid_tmask(:,:,1), is_in=isc, js_in=jsc, ie_in=iec, je_in=jec)
+          used = g_send_data(cobalt%id_f_tunicate_200, cobalt%f_tunicate_200,       &
+            model_time, rmask = grid_tmask(:,:,1), is_in=isc, js_in=jsc, ie_in=iec, je_in=jec)
           used = g_send_data(cobalt%id_f_dic_int_100, cobalt%f_dic_int_100, &
             model_time, rmask = grid_tmask(:,:,1), is_in=isc, js_in=jsc, ie_in=iec, je_in=jec)
           used = g_send_data(cobalt%id_f_din_int_100, cobalt%f_din_int_100, &
@@ -867,13 +872,18 @@ module COBALT_send_diag
           used = g_send_data(cobalt%id_ffetot_100, cobalt%ffetot_100, &
             model_time, rmask = grid_tmask(:,:,1), is_in=isc, js_in=jsc, ie_in=iec, je_in=jec)
 
-          ! mirroring the zmeso diagnostic, f_mesozoo_200 also includes gut and metabolite nitrogen
+          ! Mirroring the zmeso diagnostic, f_mesozoo_200 also includes gut and metabolite nitrogen.
+          ! f_mesozoo_200 covers the crustacean mesozooplankton only, for comparison with COPEPOD;
+          ! the gelatinous groups are integrated separately as f_tunicate_200 for comparison with
+          ! gelatinous zooplankton compilations such as JeDI.
           allocate(rho_dzt_200(isc:iec,jsc:jec))
           do j = jsc, jec ; do i = isc, iec !{
             rho_dzt_200(i,j) = rho_dzt(i,j,1)
             cobalt%f_mesozoo_200(i,j) = (zoo(MDZ)%f_n(i,j,1)+zoo(LGZ)%f_n(i,j,1)+&
                zoo(VMMDZ)%f_n(i,j,1)+zoo(VMMDZ)%f_met_n(i,j,1)+zoo(VMMDZ)%f_gut_n(i,j,1)+&
                zoo(VMLGZ)%f_n(i,j,1)+zoo(VMLGZ)%f_met_n(i,j,1)+zoo(VMLGZ)%f_gut_n(i,j,1))*rho_dzt(i,j,1)
+            cobalt%f_tunicate_200(i,j) = (zoo(SMT)%f_n(i,j,1)+&
+               zoo(LGT)%f_n(i,j,1)+zoo(LGT)%f_met_n(i,j,1)+zoo(LGT)%f_gut_n(i,j,1))*rho_dzt(i,j,1)
           enddo; enddo !} i,j
 
           do j = jsc, jec ; do i = isc, iec ; !{
@@ -884,8 +894,11 @@ module COBALT_send_diag
                 rho_dzt_200(i,j) = rho_dzt_200(i,j) + rho_dzt(i,j,k)
                 cobalt%f_mesozoo_200(i,j) = cobalt%f_mesozoo_200(i,j) + &
                   (zoo(MDZ)%f_n(i,j,k)+zoo(LGZ)%f_n(i,j,k)+&
-   	               zoo(VMMDZ)%f_n(i,j,k)+zoo(VMMDZ)%f_met_n(i,j,k)+zoo(VMMDZ)%f_gut_n(i,j,k)+&
-   	               zoo(VMLGZ)%f_n(i,j,k)+zoo(VMLGZ)%f_met_n(i,j,k)+zoo(VMLGZ)%f_gut_n(i,j,k))*rho_dzt(i,j,k)
+                   zoo(VMMDZ)%f_n(i,j,k)+zoo(VMMDZ)%f_met_n(i,j,k)+zoo(VMMDZ)%f_gut_n(i,j,k)+&
+                   zoo(VMLGZ)%f_n(i,j,k)+zoo(VMLGZ)%f_met_n(i,j,k)+zoo(VMLGZ)%f_gut_n(i,j,k))*rho_dzt(i,j,k)
+                cobalt%f_tunicate_200(i,j) = cobalt%f_tunicate_200(i,j) + &
+                  (zoo(SMT)%f_n(i,j,k)+&
+                   zoo(LGT)%f_n(i,j,k)+zoo(LGT)%f_met_n(i,j,k)+zoo(LGT)%f_gut_n(i,j,k))*rho_dzt(i,j,k)
               endif
             enddo  !} k
 
@@ -895,6 +908,9 @@ module COBALT_send_diag
                 (zoo(MDZ)%f_n(i,j,k_200)+zoo(LGZ)%f_n(i,j,k_200)+&
                  zoo(VMMDZ)%f_n(i,j,k_200)+zoo(VMMDZ)%f_met_n(i,j,k_200)+zoo(VMMDZ)%f_gut_n(i,j,k_200)+&
                  zoo(VMLGZ)%f_n(i,j,k_200)+zoo(VMLGZ)%f_met_n(i,j,k_200)+zoo(VMLGZ)%f_gut_n(i,j,k_200))*drho_dzt
+              cobalt%f_tunicate_200(i,j) = cobalt%f_tunicate_200(i,j) + &
+                (zoo(SMT)%f_n(i,j,k_200)+&
+                 zoo(LGT)%f_n(i,j,k_200)+zoo(LGT)%f_met_n(i,j,k_200)+zoo(LGT)%f_gut_n(i,j,k_200))*drho_dzt
             endif
           enddo ; enddo  !} i,j
           deallocate(rho_dzt_200)
@@ -1563,6 +1579,16 @@ module COBALT_send_diag
               model_time, rmask = grid_tmask, is_in=isc, js_in=jsc, ks_in=1,ie_in=iec, je_in=jec, ke_in=nk)
             used = g_send_data(zoo(n)%id_jprod_fedet, zoo(n)%jprod_fedet, &
               model_time, rmask = grid_tmask, is_in=isc, js_in=jsc, ks_in=1,ie_in=iec, je_in=jec, ke_in=nk)
+            used = g_send_data(zoo(n)%id_jaggloss_n, zoo(n)%jaggloss_n, &
+              model_time, rmask = grid_tmask, is_in=isc, js_in=jsc, ks_in=1,ie_in=iec, je_in=jec, ke_in=nk)
+            used = g_send_data(zoo(n)%id_jaggloss_p, zoo(n)%jaggloss_p, &
+              model_time, rmask = grid_tmask, is_in=isc, js_in=jsc, ks_in=1,ie_in=iec, je_in=jec, ke_in=nk)
+            used = g_send_data(zoo(n)%id_jprod_ndet_fast, zoo(n)%jprod_ndet_fast, &
+              model_time, rmask = grid_tmask, is_in=isc, js_in=jsc, ks_in=1,ie_in=iec, je_in=jec, ke_in=nk)
+            used = g_send_data(zoo(n)%id_jprod_pdet_fast, zoo(n)%jprod_pdet_fast, &
+              model_time, rmask = grid_tmask, is_in=isc, js_in=jsc, ks_in=1,ie_in=iec, je_in=jec, ke_in=nk)
+            used = g_send_data(zoo(n)%id_jprod_fedet_fast, zoo(n)%jprod_fedet_fast, &
+              model_time, rmask = grid_tmask, is_in=isc, js_in=jsc, ks_in=1,ie_in=iec, je_in=jec, ke_in=nk)
             used = g_send_data(zoo(n)%id_jprod_sidet, zoo(n)%jprod_sidet, &
               model_time, rmask = grid_tmask, is_in=isc, js_in=jsc, ks_in=1,ie_in=iec, je_in=jec, ke_in=nk)
             used = g_send_data(zoo(n)%id_jprod_sio4, zoo(n)%jprod_sio4, &
@@ -1577,9 +1603,17 @@ module COBALT_send_diag
               model_time, rmask = grid_tmask, is_in=isc, js_in=jsc, ks_in=1,ie_in=iec, je_in=jec, ke_in=nk)
             used = g_send_data(zoo(n)%id_temp_lim, zoo(n)%temp_lim, &
               model_time, rmask = grid_tmask, is_in=isc, js_in=jsc, ks_in=1,ie_in=iec, je_in=jec, ke_in=nk)
-            ! jmetabo_n is allocated, and id_jmetabo_n registered, only for the vertically migrating
-            ! groups (see user_allocate_arrays and cobalt_reg_diagnostics)
-            if ( n .eq. 4 .or. n .eq. 5 ) then !{
+            ! Registered for all 7 groups but never sent until now, so vmove_* and AE_* came out
+            ! as zero in every diag_table that asked for them.  Both arrays are allocated for
+            ! every group (see user_allocate_arrays), so neither send needs a does_dvm test.
+            used = g_send_data(zoo(n)%id_vmove, zoo(n)%vmove, &
+              model_time, rmask = grid_tmask, is_in=isc, js_in=jsc, ks_in=1,ie_in=iec, je_in=jec, ke_in=nk)
+            used = g_send_data(zoo(n)%id_assim_eff, zoo(n)%assim_eff, &
+              model_time, rmask = grid_tmask, is_in=isc, js_in=jsc, ks_in=1,ie_in=iec, je_in=jec, ke_in=nk)
+            ! jmetabo_n is allocated only where zoo%does_dvm is .true. (see user_allocate_arrays),
+            ! so it can only be sent for those groups. Test the flag rather than the group index:
+            ! on this branch LGT migrates too, and does_dvm is a runtime parameter.
+            if ( zoo(n)%does_dvm ) then !{
               used = g_send_data(zoo(n)%id_jmetabo_n, zoo(n)%jmetabo_n, &
                 model_time, rmask = grid_tmask, is_in=isc, js_in=jsc, ks_in=1,ie_in=iec, je_in=jec, ke_in=nk)
             endif !}
@@ -1599,6 +1633,8 @@ module COBALT_send_diag
           used = g_send_data(cobalt%id_jprod_ndet, cobalt%jprod_ndet, &
             model_time, rmask = grid_tmask, is_in=isc, js_in=jsc, ks_in=1,ie_in=iec, je_in=jec, ke_in=nk)
           used = g_send_data(cobalt%id_jprod_ndet_fast, cobalt%jprod_ndet_fast, &
+            model_time, rmask = grid_tmask, is_in=isc, js_in=jsc, ks_in=1,ie_in=iec, je_in=jec, ke_in=nk)
+          used = g_send_data(cobalt%id_jprod_fedet_fast, cobalt%jprod_fedet_fast, &
             model_time, rmask = grid_tmask, is_in=isc, js_in=jsc, ks_in=1,ie_in=iec, je_in=jec, ke_in=nk)
           used = g_send_data(cobalt%id_jprod_pdet, cobalt%jprod_pdet, &
             model_time, rmask = grid_tmask, is_in=isc, js_in=jsc, ks_in=1,ie_in=iec, je_in=jec, ke_in=nk)
@@ -1648,6 +1684,8 @@ module COBALT_send_diag
             model_time, rmask = grid_tmask, is_in=isc, js_in=jsc, ks_in=1,ie_in=iec, je_in=jec, ke_in=nk)
           used = g_send_data(cobalt%id_jremin_fedet, cobalt%jremin_fedet, &
             model_time, rmask = grid_tmask, is_in=isc, js_in=jsc, ks_in=1,ie_in=iec, je_in=jec, ke_in=nk)
+          used = g_send_data(cobalt%id_jremin_fedet_fast, cobalt%jremin_fedet_fast, &
+            model_time, rmask = grid_tmask, is_in=isc, js_in=jsc, ks_in=1,ie_in=iec, je_in=jec, ke_in=nk)
           used = g_send_data(cobalt%id_det_jzloss_n, cobalt%det_jzloss_n, &
             model_time, rmask = grid_tmask, is_in=isc, js_in=jsc, ks_in=1,ie_in=iec, je_in=jec, ke_in=nk)
           used = g_send_data(cobalt%id_det_jhploss_n, cobalt%det_jhploss_n, &
@@ -1655,6 +1693,8 @@ module COBALT_send_diag
           used = g_send_data(cobalt%id_jfed, cobalt%jfed, &
             model_time, rmask = grid_tmask, is_in=isc, js_in=jsc, ks_in=1,ie_in=iec, je_in=jec, ke_in=nk)
           used = g_send_data(cobalt%id_jfe_ads, cobalt%jfe_ads, &
+            model_time, rmask = grid_tmask, is_in=isc, js_in=jsc, ks_in=1,ie_in=iec, je_in=jec, ke_in=nk)
+          used = g_send_data(cobalt%id_jfe_ads_fast, cobalt%jfe_ads_fast, &
             model_time, rmask = grid_tmask, is_in=isc, js_in=jsc, ks_in=1,ie_in=iec, je_in=jec, ke_in=nk)
           ! Additional iron scavenging diagnostics aligned with adsorption to help understand rates
           used = g_send_data(cobalt%id_kfe_eq_lig, log10(cobalt%kfe_eq_lig+epsln), &
@@ -1928,6 +1968,8 @@ module COBALT_send_diag
           enddo !} n
           used = g_send_data(cobalt%id_jprod_mesozoo_200, cobalt%jprod_mesozoo_200, &
             model_time, rmask = grid_tmask(:,:,1), is_in=isc, js_in=jsc, ie_in=iec, je_in=jec)
+          used = g_send_data(cobalt%id_jprod_tunicate_200, cobalt%jprod_tunicate_200, &
+            model_time, rmask = grid_tmask(:,:,1), is_in=isc, js_in=jsc, ie_in=iec, je_in=jec)
           ! Higher predator 100m flux integrals
           used = g_send_data(cobalt%id_hp_jingest_n_100, cobalt%hp_jingest_n_100, &
             model_time, rmask = grid_tmask(:,:,1), is_in=isc, js_in=jsc, ie_in=iec, je_in=jec)
@@ -2041,6 +2083,8 @@ module COBALT_send_diag
           used = g_send_data(cobalt%id_jndeth, cobalt%jndeth, &
             model_time, rmask = grid_tmask, is_in=isc, js_in=jsc, ks_in=1,ie_in=iec, je_in=jec, ke_in=nk)
           used = g_send_data(cobalt%id_jndet_fast, cobalt%jndet_fast, &
+            model_time, rmask = grid_tmask, is_in=isc, js_in=jsc, ks_in=1,ie_in=iec, je_in=jec, ke_in=nk)
+          used = g_send_data(cobalt%id_jfedet_fast, cobalt%jfedet_fast, &
             model_time, rmask = grid_tmask, is_in=isc, js_in=jsc, ks_in=1,ie_in=iec, je_in=jec, ke_in=nk)
           used = g_send_data(cobalt%id_jnh4_plus_btm, cobalt%jnh4_plus_btm, &
             model_time, rmask = grid_tmask, is_in=isc, js_in=jsc, ks_in=1,ie_in=iec, je_in=jec, ke_in=nk)
