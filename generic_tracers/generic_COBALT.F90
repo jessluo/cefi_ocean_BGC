@@ -1974,10 +1974,8 @@ contains
     ! .false. for any of the three is supported and leaves that group's gut and metabolite tracers
     ! untouched at their initial values.
     !
-    ! Values are those used for the migrating crustacean zooplankton in the COBALTv2-DVM code
-    ! (M. Poupon, pers. comm. 2024), which this implementation descends from.  Note that the large
-    ! tunicates inherit the same values by default: salp gut passage differs from that of copepods,
-    ! so k_clear_gut_lgt and k_temp_gut_lgt are candidates for retuning.
+    ! Values are those used for the migrating crustacean zooplankton in the COBALTv2-DVM code, which 
+    ! this implementation descends from.  Note that the large tunicates inherit the same values as a starting point.
     !
     ! Reference:
     ! Dam and Peterson (1988): https://doi.org/10.1016/0022-0981(88)90056-8
@@ -2049,8 +2047,8 @@ contains
                    default=1.0, scale=I_sperd)
     !
     ! Diel vertical migration switch.  A group with does_dvm = .true. carries gut and metabolite pools,
-    ! is assigned a swimming velocity in section 3.2.4, and routes its egestion through gut clearance
-    ! rather than directly from ingestion.  A group with does_dvm = .false. must have swim_max = 0.
+    ! is assigned a swimming velocity, and routes its egestion through gut clearance rather than 
+    ! directly from ingestion.  A group with does_dvm = .false. must have swim_max = 0.
     !
     call get_param(param_file, "generic_COBALT", "does_dvm_smz", zoo(SMZ)%does_dvm, &
                    "small zooplankton perform diel vertical migration", default=.false.)
@@ -2067,16 +2065,18 @@ contains
     call get_param(param_file, "generic_COBALT", "does_dvm_lgt", zoo(LGT)%does_dvm, &
                    "large tunicates perform diel vertical migration", default=.true.)
 
-    ! Only the groups that own gut and metabolite tracers can migrate.  Enabling does_dvm elsewhere
-    ! would allocate that group's gut arrays with no tracer behind them: ingested material would be
-    ! loaded into a gut that is never carried or cleared, and the run would die later with an opaque
-    ! "biological source/sink imbalance: Nitrogen".  Fail here instead, where the cause is obvious.
+    ! Only the groups that own gut and metabolite tracers can migrate.
     do nzoo = 1,NUM_ZOO !{
        if (zoo(nzoo)%does_dvm .and. .not. (nzoo == VMMDZ .or. nzoo == VMLGZ .or. nzoo == LGT)) then
           call mpp_error(FATAL, 'generic_COBALT: does_dvm may only be enabled for vmmdz, vmlgz or '// &
                'lgt.  The other zooplankton groups have no gut or metabolite tracers to carry '// &
                'ingested material, so migration cannot be switched on for them from the '// &
                'parameter file.')
+       endif
+       if (.not. zoo(nzoo)%does_dvm .and. zoo(nzoo)%swim_max /= 0.0) then
+          call mpp_error(FATAL, 'generic_COBALT: a zooplankton group with does_dvm = .false. must '// &
+               'have swim_max = 0.  Set swim_max_<group> = 0.0 alongside does_dvm_<group> = False, '// &
+               'or the group keeps migrating without its gut and metabolite pools.')
        endif
     enddo !} nzoo
     !
@@ -6108,8 +6108,12 @@ contains
     ! Groups flagged with does_dvm steer on the vertical distribution of their tracked prey: at night they
     ! rise if the prey field sits shallower than the group does, and by day they descend unless oxygen is
     ! too low to sustain the effort.  Their gut and metabolite pools are advected at the same speed, which
-    ! is what carries surface-ingested material into the interior.  Groups without does_dvm retain the
-    ! simple up-at-night, down-by-day behaviour, which is a no-op at the default swim_max of 0.
+    ! is what carries surface-ingested material into the interior.
+    !
+    ! The else branch is the older, simpler rule: up at night, down by day, no prey tracking.  It always
+    ! assigns zero as the code stands, because user_add_params requires swim_max = 0 wherever does_dvm
+    ! is .false.  It is kept as the hook for giving a group simple migration without gut and metabolite
+    ! pools.
     !
     do k = 1, nk ; do j = jsc, jec ; do i = isc, iec   !{
        do n = 2, NUM_ZOO !{
@@ -9449,16 +9453,20 @@ contains
        allocate(zoo(n)%o2lim(isd:ied,jsd:jed,nk))        ; zoo(n)%o2lim           = 0.0
        allocate(zoo(n)%temp_lim(isd:ied,jsd:jed,nk))     ; zoo(n)%temp_lim        = 0.0
        allocate(zoo(n)%vmove(isd:ied,jsd:jed,nk))        ; zoo(n)%vmove           = 0.0 ! mpoupon
-       ! Gut and metabolite pools exist only for the vertically migrating groups.  does_dvm is set in
+       ! The gut and metabolite standing stocks are allocated for every group, not just the migrating
+       ! ones: the 200 m integrals f_mesozoo_200 and f_tunicate_200 in cobalt_send_diag.F90 add them
+       ! up over VMMDZ, VMLGZ and LGT without checking does_dvm.  Left at 0.0, a group that is not
+       ! migrating then contributes nothing to those sums, which is the right answer.
+       allocate(zoo(n)%f_gut_n(isd:ied,jsd:jed,nk))        ; zoo(n)%f_gut_n        = 0.0 ! mpoupon
+       allocate(zoo(n)%f_gut_p(isd:ied,jsd:jed,nk))        ; zoo(n)%f_gut_p        = 0.0 ! mpoupon
+       allocate(zoo(n)%f_gut_fe(isd:ied,jsd:jed,nk))       ; zoo(n)%f_gut_fe       = 0.0 ! mpoupon
+       allocate(zoo(n)%f_gut_si(isd:ied,jsd:jed,nk))       ; zoo(n)%f_gut_si       = 0.0 ! mpoupon
+       allocate(zoo(n)%f_met_n(isd:ied,jsd:jed,nk))        ; zoo(n)%f_met_n        = 0.0 ! mpoupon
+       ! Gut and metabolite rates exist only for the vertically migrating groups.  does_dvm is set in
        ! user_add_params, which runs from user_add_tracers during generic_COBALT_register, i.e. before
        ! generic_COBALT_init calls this routine.
        if ( zoo(n)%does_dvm ) then
          allocate(zoo(n)%jmetabo_n(isd:ied,jsd:jed,nk))      ; zoo(n)%jmetabo_n      = 0.0 ! mpoupon
-         allocate(zoo(n)%f_gut_n(isd:ied,jsd:jed,nk))        ; zoo(n)%f_gut_n        = 0.0 ! mpoupon
-         allocate(zoo(n)%f_gut_p(isd:ied,jsd:jed,nk))        ; zoo(n)%f_gut_p        = 0.0 ! mpoupon
-         allocate(zoo(n)%f_gut_fe(isd:ied,jsd:jed,nk))       ; zoo(n)%f_gut_fe       = 0.0 ! mpoupon
-         allocate(zoo(n)%f_gut_si(isd:ied,jsd:jed,nk))       ; zoo(n)%f_gut_si       = 0.0 ! mpoupon
-         allocate(zoo(n)%f_met_n(isd:ied,jsd:jed,nk))        ; zoo(n)%f_met_n        = 0.0 ! mpoupon
          allocate(zoo(n)%jclear_gut_n(isd:ied,jsd:jed,nk))   ; zoo(n)%jclear_gut_n   = 0.0 ! mpoupon
          allocate(zoo(n)%jprod_gut_n(isd:ied,jsd:jed,nk))    ; zoo(n)%jprod_gut_n    = 0.0 ! mpoupon
          allocate(zoo(n)%jclear_gut_p(isd:ied,jsd:jed,nk))   ; zoo(n)%jclear_gut_p   = 0.0 ! mpoupon
@@ -10122,13 +10130,14 @@ contains
        deallocate(zoo(n)%o2lim)
        deallocate(zoo(n)%temp_lim)
        deallocate(zoo(n)%vmove)                  ! mpoupon
-      
+       ! Allocated for every group, migrating or not -- see user_allocate_arrays.
+       deallocate(zoo(n)%f_gut_n)                ! mpoupon
+       deallocate(zoo(n)%f_gut_p)                ! mpoupon
+       deallocate(zoo(n)%f_gut_fe)               ! mpoupon
+       deallocate(zoo(n)%f_gut_si)               ! mpoupon
+       deallocate(zoo(n)%f_met_n)                ! mpoupon
+
        if ( zoo(n)%does_dvm ) then
-          deallocate(zoo(n)%f_gut_n)        ! mpoupon
-          deallocate(zoo(n)%f_gut_p)        ! mpoupon
-          deallocate(zoo(n)%f_gut_fe)       ! mpoupon
-          deallocate(zoo(n)%f_gut_si)       ! mpoupon
-          deallocate(zoo(n)%f_met_n)        ! mpoupon
           deallocate(zoo(n)%jclear_gut_n)   ! mpoupon
           deallocate(zoo(n)%jprod_gut_n)    ! mpoupon
           deallocate(zoo(n)%jclear_gut_p)   ! mpoupon

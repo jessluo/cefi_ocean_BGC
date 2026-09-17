@@ -1603,6 +1603,13 @@ module COBALT_send_diag
               model_time, rmask = grid_tmask, is_in=isc, js_in=jsc, ks_in=1,ie_in=iec, je_in=jec, ke_in=nk)
             used = g_send_data(zoo(n)%id_temp_lim, zoo(n)%temp_lim, &
               model_time, rmask = grid_tmask, is_in=isc, js_in=jsc, ks_in=1,ie_in=iec, je_in=jec, ke_in=nk)
+            ! Registered for all 7 groups but never sent until now, so vmove_* and AE_* came out
+            ! as zero in every diag_table that asked for them.  Both arrays are allocated for
+            ! every group (see user_allocate_arrays), so neither send needs a does_dvm test.
+            used = g_send_data(zoo(n)%id_vmove, zoo(n)%vmove, &
+              model_time, rmask = grid_tmask, is_in=isc, js_in=jsc, ks_in=1,ie_in=iec, je_in=jec, ke_in=nk)
+            used = g_send_data(zoo(n)%id_assim_eff, zoo(n)%assim_eff, &
+              model_time, rmask = grid_tmask, is_in=isc, js_in=jsc, ks_in=1,ie_in=iec, je_in=jec, ke_in=nk)
             ! jmetabo_n is allocated only where zoo%does_dvm is .true. (see user_allocate_arrays),
             ! so it can only be sent for those groups. Test the flag rather than the group index:
             ! on this branch LGT migrates too, and does_dvm is a runtime parameter.
