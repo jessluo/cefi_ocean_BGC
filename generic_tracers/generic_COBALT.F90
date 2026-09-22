@@ -1878,13 +1878,16 @@ contains
     !
     ! Zooplankton production is then
     !
-    !   jprod_n = AE*lim_nut_n_ingestion - basal_respiration - phi_aresp*lim_nut_n_ingestion
+    !   jprod_n = (AE - phi_aresp)*jingest_n - basal_respiration
+    !   jprod_n = min(jprod_n, AE*jingest_p/q_p_2_n)
     !
-    ! where phi_aresp is the fraction of ingestion lost to active (feeding-dependent) respiration.  Note
-    ! that with a constant AE this reduces exactly to the COBALTv3 gross-growth-efficiency formulation
-    ! with gge_max = AE - phi_aresp, so the defaults below (AE = 0.7, phi_aresp = 0.3) reproduce the
-    ! previous gge_max = 0.4 behaviour for the non-tunicate groups.  gge_max itself is retained in the
-    ! parameter list for reference and for the bacteria, but is no longer used for zooplankton.
+    ! where phi_aresp is the fraction of ingestion lost to active (feeding-dependent) respiration, and the
+    ! second line caps growth at the nitrogen the assimilated phosphorus can support.  With a constant AE
+    ! this reduces exactly to the COBALTv3 gross-growth-efficiency formulation with gge_max = AE - phi_aresp,
+    ! so the defaults below (AE = 0.7, phi_aresp = 0.3) reproduce the previous gge_max = 0.4 behaviour for the
+    ! non-tunicate groups.  gge_max itself is retained in the parameter list for reference and for the
+    ! bacteria, but is no longer used for zooplankton.  Migrating groups cap at gut clearance instead; see
+    ! section 3.3.2.
     !
     ! Tunicates are mucous-net filter feeders with high maximum AE but strongly declining AE at high food
     ! concentrations (superfluous feeding), captured by the low assim_eff_min and finite kae below.
@@ -4088,7 +4091,7 @@ contains
     real :: a_theta, diff_theta2, diff_theta2_tol
     real :: tot_prey_hp, sw_fac_denom, basal_respiration, swim
     real :: egest_n, egest_p, egest_fe, egest_si  ! egested (unassimilated) material available for partitioning
-    real :: lim_nut_n_ingestion                   ! assimilable ingestion after N/P colimitation (mol N kg-1 s-1)
+    real :: jclear_gut_n_usable                   ! gut-clearance N that P can match at q_p_2_n (mol N kg-1 s-1)
     real :: bact_uptake_ratio, vmax_bact, growth_ratio, food1, food2
     real :: fpoc_btm, log10_fpoc_btm
     real :: fe_salt
@@ -6244,10 +6247,11 @@ contains
        ! shallow remineralization that acts on bulk detritus.
        !
        ! Vertically migrating groups (zoo%does_dvm) do not egest where they feed.  Their ingestion is loaded
-       ! into a gut pool that travels with them, and egestion is driven by gut clearance instead.  Because gut
-       ! contents can be N- or P-limited relative to the animal's own stoichiometry, the assimilable flux for
-       ! those groups is lim_nut_n_ingestion = min(jclear_gut_n, jclear_gut_p/q_p_2_n) and the remainder of
-       ! the cleared gut is excreted as inorganic nutrient in section 3.3.2.
+       ! into a gut pool that travels with them, and egestion is driven by gut clearance instead.  The gut
+       ! tracks N, P, Si and Fe separately because prey stoichiometry is dynamic and the predator egests far
+       ! from where it fed, so fecal matter carries the prey N:P and not the predator's.  Only
+       ! jclear_gut_n_usable = min(jclear_gut_n, jclear_gut_p/q_p_2_n) of the cleared gut can be assimilated;
+       ! the assimilated surplus above that is excreted as inorganic nutrient in section 3.3.2.
        !
        ! Silica is not assimilated by any group, so its partitioning between sinking opal and rapid dissolution
        ! is set directly by phi_det_si and carries no (1 - AE) factor.
@@ -6260,10 +6264,8 @@ contains
            zoo(m)%jclear_gut_fe(i,j,k) = (zoo(m)%k_clear_gut + zoo(m)%k_temp_gut * Temp(i,j,k)) * zoo(m)%f_gut_fe(i,j,k)
            zoo(m)%jclear_gut_si(i,j,k) = (zoo(m)%k_clear_gut + zoo(m)%k_temp_gut * Temp(i,j,k)) * zoo(m)%f_gut_si(i,j,k)
 
-           zoo(m)%lim_nut_n_ingestion(i,j,k) = min(zoo(m)%jclear_gut_n(i,j,k), zoo(m)%jclear_gut_p(i,j,k)/zoo(m)%q_p_2_n)
-
-           egest_n  = (1.0 - zoo(m)%assim_eff(i,j,k))*zoo(m)%lim_nut_n_ingestion(i,j,k)
-           egest_p  = egest_n*zoo(m)%q_p_2_n
+           egest_n  = (1.0 - zoo(m)%assim_eff(i,j,k))*zoo(m)%jclear_gut_n(i,j,k)
+           egest_p  = (1.0 - zoo(m)%assim_eff(i,j,k))*zoo(m)%jclear_gut_p(i,j,k)
            egest_fe = (1.0 - zoo(m)%assim_eff(i,j,k))*zoo(m)%jclear_gut_fe(i,j,k)
            egest_si = zoo(m)%jclear_gut_si(i,j,k)
          else !} {
@@ -6402,22 +6404,28 @@ contains
        ! 2. phi_aresp is the fraction of ingestion lost to active, feeding-dependent respiration.
        ! 3. bresp sets the basal respiration rate, which depends on biomass rather than ingestion.
        !
-       ! Production is then the assimilated flux less both respiration terms:
+       ! Production is the assimilated nitrogen less both respiration terms, limited by the nitrogen that
+       ! the assimilated phosphorus can support:
        !
-       !   jprod_n = AE*lim_nut_n_ingestion - basal_respiration - phi_aresp*lim_nut_n_ingestion
+       !   jprod_n = (AE - phi_aresp)*jingest_n - basal_respiration
+       !   jprod_n = min(jprod_n, AE*jingest_p/q_p_2_n)
        !
-       ! where lim_nut_n_ingestion = min(jingest_n, jingest_p/q_p_2_n) accounts for the possibility that the
-       ! prey field cannot supply N and P in the proportions the consumer needs.  The gross growth efficiency
-       ! of earlier COBALT versions is recovered exactly as gge = AE - phi_aresp, so the default AE = 0.7 with
-       ! phi_aresp = 0.3 reproduces the previous gge_max = 0.4 behaviour.  When production is negative, all
-       ! assimilated material is respired and the net mortality is routed to detritus.  Nutrients are excreted
-       ! in balance with respiration.
+       ! AE applies to N and P alike, so the assimilated pool carries the prey N:P while biomass is fixed
+       ! at q_p_2_n.  Only biomass requires P: respiration releases it.  The limit therefore sits on
+       ! jprod_n, and where P limits the consumer keeps all its assimilated P and excretes the surplus N as
+       ! ammonium, so jprod_po4 goes to 0.  The COBALTv2-DVM and GZ-COBALT code this descends from applied
+       ! the limit to ingestion instead, as min(jingest_n, jingest_p/q_p_2_n), before subtracting
+       ! respiration.  The form above is standard COBALTv2/v3 and is what lets this code reduce to it:
+       ! gge_max = AE - phi_aresp, so the defaults AE = 0.7 and phi_aresp = 0.3 reproduce gge_max = 0.4.
+       ! When production is negative, all assimilated material is respired and the net mortality is routed
+       ! to detritus.
        !
        ! Vertically migrating groups (zoo%does_dvm) interpose two pools between ingestion and growth: a gut pool
        ! holding unprocessed food and a metabolite pool holding assimilated material awaiting conversion to
        ! biomass.  Both travel with the animal, so a migrator that feeds at the surface at night and clears its
        ! gut at depth by day actively transports N, P, Fe and Si downward.  Their active respiration is charged
-       ! against swimming effort through the |vmove|/swim_ref term.
+       ! against swimming effort through the |vmove|/swim_ref term.  The metabolite pool holds N only, so they
+       ! cap at gut clearance instead; the migrating branch below says why, and what it costs.
        !
        ! References:
        ! Hansen, P.J., Bjornsen, P.K., Hansen, B.W., 1997. Zooplankton grazing and growth: scaling within the
@@ -6435,9 +6443,19 @@ contains
                               zoo(m)%temp_lim(i,j,k)*zoo(m)%bresp*zoo(m)%f_n(i,j,k)
 
          ! Migrating zooplankton
+         !
+         ! Since f_met_n holds N only, with P calculated using q_p_2_n, material entering the metabolite pool
+         ! must already be at the N:P of the zooplankton.  Note that the phosphorus limit is applied at gut
+         ! clearance and cannot be applied at jprod_n as it is for the non-migrating groups below.  Respiration
+         ! then draws on limited material and returns its share of P through jmetabo_n*q_p_2_n, so a P-limited
+         ! migrating group still excretes phosphorus where a non-migrating one keeps all of it.  Decide later
+         ! if allowing P metabolite tracers to vary is worth the cost of 1 additional tracer per migrator to
+         ! eliminate the discrepancy between migrators and non-migrators (pvmmdz_met, pvmlgz_met, plgt_met).
          if ( zoo(m)%does_dvm ) then !{
-            ! lim_nut_n_ingestion was set from gut clearance in section 3.3.1
-            lim_nut_n_ingestion = zoo(m)%lim_nut_n_ingestion(i,j,k)
+            ! compute the P-limited gut clearance flux (in N units) according to the zooplankter's N:P ratio
+            ! renamed from lim_nut_n_ingestion in COBALTv2-DVM and GZ-COBALT
+            jclear_gut_n_usable = min(zoo(m)%jclear_gut_n(i,j,k), zoo(m)%jclear_gut_p(i,j,k)/zoo(m)%q_p_2_n)
+            zoo(m)%jclear_gut_n_usable(i,j,k) = jclear_gut_n_usable
 
             ! everything ingested is loaded into the gut pool and carried with the animal
             zoo(m)%jprod_gut_n(i,j,k)   = zoo(m)%jingest_n(i,j,k)
@@ -6446,20 +6464,25 @@ contains
             zoo(m)%jprod_gut_si(i,j,k)  = zoo(m)%jingest_sio2(i,j,k)
 
             ! the assimilated fraction of the cleared gut enters the metabolite pool
-            zoo(m)%jprod_met_n(i,j,k)   = zoo(m)%assim_eff(i,j,k) * lim_nut_n_ingestion
+            zoo(m)%jprod_met_n(i,j,k)   = zoo(m)%assim_eff(i,j,k) * jclear_gut_n_usable
             zoo(m)%jclear_met_n(i,j,k)  = zoo(m)%f_met_n(i,j,k) * zoo(m)%k_clear_met
 
             ! respiration is elevated in proportion to swimming effort, and by active feeding respiration
             zoo(m)%jmetabo_n(i,j,k) = basal_respiration * (1.0 + abs(zoo(m)%vmove(i,j,k)) / zoo(m)%swim_ref) + &
-                                      zoo(m)%phi_aresp * lim_nut_n_ingestion
+                                      zoo(m)%phi_aresp * jclear_gut_n_usable
 
             zoo(m)%jprod_n(i,j,k)   = zoo(m)%jclear_met_n(i,j,k) - zoo(m)%jmetabo_n(i,j,k)
 
-            ! the portion of the cleared gut that could not be assimilated is excreted directly, along with
-            ! the respired metabolites; min(jprod_n,0) removes the metabolites that were never available
-            zoo(m)%jprod_nh4(i,j,k) = zoo(m)%jclear_gut_n(i,j,k) - lim_nut_n_ingestion + &
+            ! Two pools empty here, and each sends a share to nh4 and po4.  From the gut: the N with no P to
+            ! pair with cannot enter the metabolite pool, so it is excreted at once.  From the metabolite
+            ! pool: jmetabo_n is respired.  jmetabo_n is set from biomass and feeding rather than from pool
+            ! contents, so it can exceed jclear_met_n; min(jprod_n,0) then removes the metabolites that were
+            ! never there, and the negative production block below takes that deficit from biomass instead.
+            zoo(m)%jprod_nh4(i,j,k) = zoo(m)%assim_eff(i,j,k)*(zoo(m)%jclear_gut_n(i,j,k) - &
+                                      jclear_gut_n_usable) + &
                                       zoo(m)%jmetabo_n(i,j,k) + min(zoo(m)%jprod_n(i,j,k),0.0)
-            zoo(m)%jprod_po4(i,j,k) = zoo(m)%jclear_gut_p(i,j,k) - lim_nut_n_ingestion*zoo(m)%q_p_2_n + &
+            zoo(m)%jprod_po4(i,j,k) = zoo(m)%assim_eff(i,j,k)*(zoo(m)%jclear_gut_p(i,j,k) - &
+                                      jclear_gut_n_usable*zoo(m)%q_p_2_n) + &
                                       zoo(m)%jmetabo_n(i,j,k)*zoo(m)%q_p_2_n + &
                                       min(zoo(m)%jprod_n(i,j,k)*zoo(m)%q_p_2_n,0.0)
 
@@ -6469,11 +6492,10 @@ contains
 
          ! Non-migrating zooplankton
          else !} {
-            lim_nut_n_ingestion = min(zoo(m)%jingest_n(i,j,k), zoo(m)%jingest_p(i,j,k)/zoo(m)%q_p_2_n)
-            zoo(m)%lim_nut_n_ingestion(i,j,k) = lim_nut_n_ingestion
-
-            zoo(m)%jprod_n(i,j,k) = zoo(m)%assim_eff(i,j,k)*lim_nut_n_ingestion - basal_respiration - &
-                                    zoo(m)%phi_aresp*lim_nut_n_ingestion
+            zoo(m)%jprod_n(i,j,k) = (zoo(m)%assim_eff(i,j,k) - zoo(m)%phi_aresp)*zoo(m)%jingest_n(i,j,k) - &
+                                    basal_respiration
+            zoo(m)%jprod_n(i,j,k) = min(zoo(m)%jprod_n(i,j,k), &
+                                        zoo(m)%assim_eff(i,j,k)*zoo(m)%jingest_p(i,j,k)/zoo(m)%q_p_2_n)
 
             ! Assimilated material that does not go to production is excreted as nh4 or po4 as part of the
             ! respiration process.  Note that ingestion is oxygen limited and is 0 below o2_min, so jingest_n
@@ -9419,8 +9441,6 @@ contains
     do n = 1, NUM_ZOO
        allocate(zoo(n)%f_n(isd:ied,jsd:jed,nk))           ; zoo(n)%f_n            = 0.0
        allocate(zoo(n)%assim_eff(isd:ied,jsd:jed,nk))     ; zoo(n)%assim_eff      = 0.0
-       ! lim_nut_n_ingestion is set for every group in section 3.3.2, not just the migrators
-       allocate(zoo(n)%lim_nut_n_ingestion(isd:ied,jsd:jed,nk)) ; zoo(n)%lim_nut_n_ingestion = 0.0
        allocate(zoo(n)%jzloss_n(isd:ied,jsd:jed,nk))      ; zoo(n)%jzloss_n       = 0.0
        allocate(zoo(n)%jaggloss_n(isd:ied,jsd:jed,nk))    ; zoo(n)%jaggloss_n     = 0.0
        allocate(zoo(n)%jaggloss_p(isd:ied,jsd:jed,nk))    ; zoo(n)%jaggloss_p     = 0.0
@@ -9467,6 +9487,7 @@ contains
        ! generic_COBALT_init calls this routine.
        if ( zoo(n)%does_dvm ) then
          allocate(zoo(n)%jmetabo_n(isd:ied,jsd:jed,nk))      ; zoo(n)%jmetabo_n      = 0.0 ! mpoupon
+         allocate(zoo(n)%jclear_gut_n_usable(isd:ied,jsd:jed,nk)); zoo(n)%jclear_gut_n_usable = 0.0
          allocate(zoo(n)%jclear_gut_n(isd:ied,jsd:jed,nk))   ; zoo(n)%jclear_gut_n   = 0.0 ! mpoupon
          allocate(zoo(n)%jprod_gut_n(isd:ied,jsd:jed,nk))    ; zoo(n)%jprod_gut_n    = 0.0 ! mpoupon
          allocate(zoo(n)%jclear_gut_p(isd:ied,jsd:jed,nk))   ; zoo(n)%jclear_gut_p   = 0.0 ! mpoupon
@@ -10097,7 +10118,6 @@ contains
     do n = 1, NUM_ZOO
        deallocate(zoo(n)%f_n)
        deallocate(zoo(n)%assim_eff)
-       deallocate(zoo(n)%lim_nut_n_ingestion)
        deallocate(zoo(n)%jzloss_n)
        deallocate(zoo(n)%jaggloss_n)
        deallocate(zoo(n)%jaggloss_p)
@@ -10138,6 +10158,7 @@ contains
        deallocate(zoo(n)%f_met_n)                ! mpoupon
 
        if ( zoo(n)%does_dvm ) then
+          deallocate(zoo(n)%jclear_gut_n_usable)
           deallocate(zoo(n)%jclear_gut_n)   ! mpoupon
           deallocate(zoo(n)%jprod_gut_n)    ! mpoupon
           deallocate(zoo(n)%jclear_gut_p)   ! mpoupon

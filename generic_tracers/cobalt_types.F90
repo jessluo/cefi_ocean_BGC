@@ -365,7 +365,8 @@ module cobalt_types
     real, ALLOCATABLE, dimension(:,:,:) ::  jprod_gut_si    ! mpoupon
     real, ALLOCATABLE, dimension(:,:,:) ::  jclear_met_n    ! mpoupon
     real, ALLOCATABLE, dimension(:,:,:) ::  jprod_met_n     ! mpoupon 
-    real, ALLOCATABLE, dimension(:,:,:) ::  lim_nut_n_ingestion  ! mpoupon
+    real, ALLOCATABLE, dimension(:,:,:) ::  jclear_gut_n_usable  ! gut-clearance N that gut-clearance P
+                                            ! can match at q_p_2_n, min(N, P/q_p_2_n); migrating groups only
     real, ALLOCATABLE, dimension(:,:,:) ::  jmetabo_n    ! mpoupon
     real, ALLOCATABLE, dimension(:,:,:) ::  jzloss_n     !< Losses of n due to consumption by other zooplankton groups
     real, ALLOCATABLE, dimension(:,:,:) ::  jzloss_p     !< Losses of p due to consumption by other zooplankton groups
@@ -448,7 +449,7 @@ module cobalt_types
     integer ::   id_jclear_met_n      = -1 !
     integer ::   id_jprod_met_n       = -1 !
     integer ::   id_jmetabo_n         = -1 !
-    integer ::   id_lim_nut_n_ingestion = -1 !
+    integer ::   id_jclear_gut_n_usable = -1 !
     integer ::  id_jprod_n_100    = -1 !< ID associated with diagnostics for zooplankton nitrogen prod. integral in upper 100m
     integer ::  id_jingest_n_100  = -1 !< ID associated with diagnostics for zooplankton nitrogen ingestion integral in upper 100m
     integer ::  id_jzloss_n_100   = -1 !< ID associated with diagnostics for zooplankton nitrogen loss to zooplankton integral in upper 100m
