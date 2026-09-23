@@ -5229,6 +5229,10 @@ contains
     ! separate from ipa_matrix: ipa_matrix sets how strongly a migrator grazes each resource once the two
     ! are co-located, while dvm_prey_wgt sets what the animal orients toward when deciding where to be.
     !
+    ! Each migrator tracks everything it eats except other migrating prey (VMMDZ, LGT).  Those prey move
+    ! on their own diel schedule, so steering toward them would couple the migrators to one another
+    ! rather than to the resident food field.  They are still eaten wherever the two co-occur.
+    !
     dvm_prey_wgt(:,:) = 0.0
     ! Medium migrators track the small phytoplankton-to-microzooplankton food web
     dvm_prey_wgt(VMMDZ,PR_DIAZ) = 1.0
@@ -5236,11 +5240,13 @@ contains
     dvm_prey_wgt(VMMDZ,PR_MDP)  = 1.0
     dvm_prey_wgt(VMMDZ,PR_SMP)  = 1.0
     dvm_prey_wgt(VMMDZ,PR_SMZ)  = 1.0
+    dvm_prey_wgt(VMMDZ,PR_SMT)  = 1.0
     ! Large migrators track large phytoplankton and mesozooplankton
     dvm_prey_wgt(VMLGZ,PR_DIAZ) = 1.0
     dvm_prey_wgt(VMLGZ,PR_LGP)  = 1.0
     dvm_prey_wgt(VMLGZ,PR_MDP)  = 1.0
     dvm_prey_wgt(VMLGZ,PR_MDZ)  = 1.0
+    dvm_prey_wgt(VMLGZ,PR_SMT)  = 1.0
     ! Large tunicates are non-selective filter feeders and track their whole resource spectrum
     dvm_prey_wgt(LGT,PR_DIAZ) = 1.0
     dvm_prey_wgt(LGT,PR_LGP)  = 1.0
