@@ -1886,8 +1886,8 @@ contains
     ! this reduces exactly to the COBALTv3 gross-growth-efficiency formulation with gge_max = AE - phi_aresp,
     ! so the defaults below (AE = 0.7, phi_aresp = 0.3) reproduce the previous gge_max = 0.4 behaviour for the
     ! non-tunicate groups.  gge_max itself is retained in the parameter list for reference and for the
-    ! bacteria, but is no longer used for zooplankton.  Migrating groups cap at gut clearance instead; see
-    ! section 3.3.2.
+    ! bacteria, but is no longer used for zooplankton.  Migrating groups apply the same rule through their
+    ! gut and metabolite pools; see section 3.3.2.
     !
     ! Tunicates are mucous-net filter feeders with high maximum AE but strongly declining AE at high food
     ! concentrations (superfluous feeding), captured by the low assim_eff_min and finite kae below.
@@ -4091,6 +4091,8 @@ contains
     real :: tot_prey_hp, sw_fac_denom, basal_respiration, swim
     real :: egest_n, egest_p, egest_fe, egest_si  ! egested (unassimilated) material available for partitioning
     real :: jclear_gut_n_usable                   ! gut-clearance N that P can match at q_p_2_n (mol N kg-1 s-1)
+    real :: surplus_n                             ! assimilated gut-clearance N with no P partner (mol N kg-1 s-1)
+    real :: resp_from_met                         ! respiration not covered by surplus_n, drawn from metabolites
     real :: bact_uptake_ratio, vmax_bact, growth_ratio, food1, food2
     real :: fpoc_btm, log10_fpoc_btm
     real :: fe_salt
@@ -6248,9 +6250,7 @@ contains
        ! Vertically migrating groups (zoo%does_dvm) do not egest where they feed.  Their ingestion is loaded
        ! into a gut pool that travels with them, and egestion is driven by gut clearance instead.  The gut
        ! tracks N, P, Si and Fe separately because prey stoichiometry is dynamic and the predator egests far
-       ! from where it fed, so fecal matter carries the prey N:P and not the predator's.  Only
-       ! jclear_gut_n_usable = min(jclear_gut_n, jclear_gut_p/q_p_2_n) of the cleared gut can be assimilated;
-       ! the assimilated surplus above that is excreted as inorganic nutrient in section 3.3.2.
+       ! from where it fed, so fecal matter carries the prey N:P and not the predator's.
        !
        ! Silica is not assimilated by any group, so its partitioning between sinking opal and rapid dissolution
        ! is set directly by phi_det_si and carries no (1 - AE) factor.
@@ -6409,22 +6409,21 @@ contains
        !   jprod_n = (AE - phi_aresp)*jingest_n - basal_respiration
        !   jprod_n = min(jprod_n, AE*jingest_p/q_p_2_n)
        !
-       ! AE applies to N and P alike, so the assimilated pool carries the prey N:P while biomass is fixed
-       ! at q_p_2_n.  Only biomass requires P: respiration releases it.  The limit therefore sits on
-       ! jprod_n, and where P limits the consumer keeps all its assimilated P and excretes the surplus N as
-       ! ammonium, so jprod_po4 goes to 0.  The COBALTv2-DVM and GZ-COBALT code this descends from applied
-       ! the limit to ingestion instead, as min(jingest_n, jingest_p/q_p_2_n), before subtracting
-       ! respiration.  The form above is standard COBALTv2/v3 and is what lets this code reduce to it:
-       ! gge_max = AE - phi_aresp, so the defaults AE = 0.7 and phi_aresp = 0.3 reproduce gge_max = 0.4.
-       ! When production is negative, all assimilated material is respired and the net mortality is routed
-       ! to detritus.
+       ! AE applies to N and P alike, so assimilated material carries the prey N:P while biomass is fixed at
+       ! q_p_2_n.  The min() is equivalent to paying respiration first from the assimilated N that has no P
+       ! to pair with.  If that unpaired N covers respiration, all assimilated P goes to biomass (P limits,
+       ! jprod_po4 = 0) and the unpaired N is excreted as ammonium.  If it does not, the rest of the
+       ! respiration is drawn from P-paired material, releasing its P, and N limits.  COBALTv2-DVM and
+       ! GZ-COBALT instead applied min(jingest_n, jingest_p/q_p_2_n) to ingestion before subtracting
+       ! respiration, charging it to P-paired material even when unpaired N was available.  The form above
+       ! is standard COBALTv2/v3, with gge_max = AE - phi_aresp.  When production is negative, all
+       ! assimilated material is respired and the net mortality is routed to detritus.
        !
        ! Vertically migrating groups (zoo%does_dvm) interpose two pools between ingestion and growth: a gut pool
        ! holding unprocessed food and a metabolite pool holding assimilated material awaiting conversion to
        ! biomass.  Both travel with the animal, so a migrator that feeds at the surface at night and clears its
-       ! gut at depth by day actively transports N, P, Fe and Si downward.  Their active respiration is charged
-       ! against swimming effort through the |vmove|/swim_ref term.  The metabolite pool holds N only, so they
-       ! cap at gut clearance instead; the migrating branch below says why, and what it costs.
+       ! gut at depth by day actively transports N, P, Fe and Si downward.  Their basal respiration is raised in
+       ! proportion to swimming effort through the |vmove|/swim_ref term.
        !
        ! References:
        ! Hansen, P.J., Bjornsen, P.K., Hansen, B.W., 1997. Zooplankton grazing and growth: scaling within the
@@ -6443,13 +6442,10 @@ contains
 
          ! Migrating zooplankton
          !
-         ! Since f_met_n holds N only, with P calculated using q_p_2_n, material entering the metabolite pool
-         ! must already be at the N:P of the zooplankton.  Note that the phosphorus limit is applied at gut
-         ! clearance and cannot be applied at jprod_n as it is for the non-migrating groups below.  Respiration
-         ! then draws on limited material and returns its share of P through jmetabo_n*q_p_2_n, so a P-limited
-         ! migrating group still excretes phosphorus where a non-migrating one keeps all of it.  Decide later
-         ! if allowing P metabolite tracers to vary is worth the cost of 1 additional tracer per migrator to
-         ! eliminate the discrepancy between migrators and non-migrators (pvmmdz_met, pvmlgz_met, plgt_met).
+         ! f_met_n holds N only, with its P implied at q_p_2_n, so only jclear_gut_n_usable can enter the
+         ! metabolite pool and the respiration rule above is applied explicitly below.  At steady state this
+         ! gives the non-migrating jprod_n exactly; it differs only when the gut and metabolite pool are out
+         ! of step, e.g. an empty gut at depth, where respiration draws on stored metabolites.
          if ( zoo(m)%does_dvm ) then !{
             ! compute the P-limited gut clearance flux (in N units) according to the zooplankter's N:P ratio
             ! renamed from lim_nut_n_ingestion in COBALTv2-DVM and GZ-COBALT
@@ -6466,23 +6462,24 @@ contains
             zoo(m)%jprod_met_n(i,j,k)   = zoo(m)%assim_eff(i,j,k) * jclear_gut_n_usable
             zoo(m)%jclear_met_n(i,j,k)  = zoo(m)%f_met_n(i,j,k) * zoo(m)%k_clear_met
 
-            ! respiration is elevated in proportion to swimming effort, and by active feeding respiration
+            ! active respiration scales with the cleared gut, as with ingestion for the non-migrating groups
             zoo(m)%jmetabo_n(i,j,k) = basal_respiration * (1.0 + abs(zoo(m)%vmove(i,j,k)) / zoo(m)%swim_ref) + &
-                                      zoo(m)%phi_aresp * jclear_gut_n_usable
+                                      zoo(m)%phi_aresp * zoo(m)%jclear_gut_n(i,j,k)
 
-            zoo(m)%jprod_n(i,j,k)   = zoo(m)%jclear_met_n(i,j,k) - zoo(m)%jmetabo_n(i,j,k)
+            ! unpaired N pays for respiration first; only the remainder is drawn from the metabolite pool
+            surplus_n     = zoo(m)%assim_eff(i,j,k)*(zoo(m)%jclear_gut_n(i,j,k) - jclear_gut_n_usable)
+            resp_from_met = max(zoo(m)%jmetabo_n(i,j,k) - surplus_n, 0.0)
 
-            ! Two pools empty here, and each sends a share to nh4 and po4.  From the gut: the N with no P to
-            ! pair with cannot enter the metabolite pool, so it is excreted at once.  From the metabolite
-            ! pool: jmetabo_n is respired.  jmetabo_n is set from biomass and feeding rather than from pool
-            ! contents, so it can exceed jclear_met_n; min(jprod_n,0) then removes the metabolites that were
-            ! never there, and the negative production block below takes that deficit from biomass instead.
-            zoo(m)%jprod_nh4(i,j,k) = zoo(m)%assim_eff(i,j,k)*(zoo(m)%jclear_gut_n(i,j,k) - &
-                                      jclear_gut_n_usable) + &
-                                      zoo(m)%jmetabo_n(i,j,k) + min(zoo(m)%jprod_n(i,j,k),0.0)
+            zoo(m)%jprod_n(i,j,k)   = zoo(m)%jclear_met_n(i,j,k) - resp_from_met
+
+            ! All unpaired N is excreted, whether or not it paid for respiration.  Metabolites respired
+            ! (resp_from_met) release N and their P.  resp_from_met can exceed jclear_met_n; min(jprod_n,0)
+            ! then removes the metabolites that were never there, and the negative production block below
+            ! takes that deficit from biomass instead.
+            zoo(m)%jprod_nh4(i,j,k) = surplus_n + resp_from_met + min(zoo(m)%jprod_n(i,j,k),0.0)
             zoo(m)%jprod_po4(i,j,k) = zoo(m)%assim_eff(i,j,k)*(zoo(m)%jclear_gut_p(i,j,k) - &
                                       jclear_gut_n_usable*zoo(m)%q_p_2_n) + &
-                                      zoo(m)%jmetabo_n(i,j,k)*zoo(m)%q_p_2_n + &
+                                      resp_from_met*zoo(m)%q_p_2_n + &
                                       min(zoo(m)%jprod_n(i,j,k)*zoo(m)%q_p_2_n,0.0)
 
             zoo(m)%jprod_fed(i,j,k)  = zoo(m)%jclear_gut_fe(i,j,k) - zoo(m)%jprod_fedet(i,j,k) - &
