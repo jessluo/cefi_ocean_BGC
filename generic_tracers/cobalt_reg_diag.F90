@@ -5796,7 +5796,7 @@ module COBALT_reg_diag
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("ffedet_fast","Fast sinking iron detritus flux",'h','1','s','mol m-2 s-1','f')
-    cobalt%id_ffedet_fast_tp = register_diag_field(package_name, vardesc_temp%name, axesTi(1:1),&
+    cobalt%id_ffedet_fast_tp = register_diag_field(package_name, vardesc_temp%name, axesTi(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
     vardesc_temp = vardesc("ffedet_fast_btm","Fast sinking iron detritus flux to sediments", &

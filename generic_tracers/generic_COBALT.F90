@@ -8845,8 +8845,8 @@ contains
              zoo(VMMDZ)%jprod_n(i,j,1) + zoo(VMLGZ)%jprod_n(i,j,1))*rho_dzt(i,j,1)
        cobalt%jprod_tunicate_200(i,j) = (zoo(SMT)%jprod_n(i,j,1) + &
              zoo(LGT)%jprod_n(i,j,1))*rho_dzt(i,j,1)
-       cobalt%jprod_allphytos_200(i,j) = (phyto(1)%jprod_n(i,j,1) + phyto(2)%jprod_n(i,j,1) + &
-             phyto(3)%jprod_n(i,j,1) + phyto(4)%jprod_n(i,j,1))*rho_dzt(i,j,1);
+       cobalt%jprod_allphytos_200(i,j) = (phyto(DIAZ)%jprod_n(i,j,1) + phyto(LGP)%jprod_n(i,j,1) + &
+             phyto(MDP)%jprod_n(i,j,1) + phyto(SMP)%jprod_n(i,j,1))*rho_dzt(i,j,1);
     enddo; enddo !} i,j
 
     do j = jsc, jec ; do i = isc, iec ; !{
