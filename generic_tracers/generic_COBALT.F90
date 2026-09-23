@@ -370,7 +370,7 @@ contains
     !==============================================================
 
     integer :: stdoutunit
-    integer :: nzoo               !< loop index for validating the per-group DVM settings
+    integer :: n                  !< loop index over zooplankton groups
     real    :: phi_sum_n          !< sum of a partition of nitrogen losses, which must be 1 to conserve mass
     real    :: phi_sum_p          !< sum of a partition of phosphorus losses, which must be 1 to conserve mass
     character(len=256) :: phi_msg !< buffer for reporting a partition that does not sum to 1
@@ -2075,19 +2075,19 @@ contains
                    "large tunicates perform diel vertical migration", default=.true.)
 
     ! Only the groups that own gut and metabolite tracers can migrate.
-    do nzoo = 1,NUM_ZOO !{
-       if (zoo(nzoo)%does_dvm .and. .not. (nzoo == VMMDZ .or. nzoo == VMLGZ .or. nzoo == LGT)) then
+    do n = 1,NUM_ZOO !{
+       if (zoo(n)%does_dvm .and. .not. (n == VMMDZ .or. n == VMLGZ .or. n == LGT)) then
           call mpp_error(FATAL, 'generic_COBALT: does_dvm may only be enabled for vmmdz, vmlgz or '// &
                'lgt.  The other zooplankton groups have no gut or metabolite tracers to carry '// &
                'ingested material, so migration cannot be switched on for them from the '// &
                'parameter file.')
        endif
-       if (.not. zoo(nzoo)%does_dvm .and. zoo(nzoo)%swim_max /= 0.0) then
+       if (.not. zoo(n)%does_dvm .and. zoo(n)%swim_max /= 0.0) then
           call mpp_error(FATAL, 'generic_COBALT: a zooplankton group with does_dvm = .false. must '// &
                'have swim_max = 0.  Set swim_max_<group> = 0.0 alongside does_dvm_<group> = False, '// &
                'or the group keeps migrating without its gut and metabolite pools.')
        endif
-    enddo !} nzoo
+    enddo !} n
     !
     ! Zooplankton aggregation.  Salps in particular form dense blooms that collapse into rapidly sinking
     ! carcass aggregations ("salp falls"), which are routed entirely to fast-sinking detritus.  This is
@@ -2164,16 +2164,16 @@ contains
     ! the zooplankton phi_* were fractions of total ingestion and summed to less than 1.  The defaults
     ! satisfy this by construction; overriding phi_det_<group> alone is safe, overriding any other one
     ! alone is not.
-    do nzoo = 1,NUM_ZOO !{
-       phi_sum_n = zoo(nzoo)%phi_det + zoo(nzoo)%phi_ldon + zoo(nzoo)%phi_sldon + zoo(nzoo)%phi_srdon
-       phi_sum_p = zoo(nzoo)%phi_det + zoo(nzoo)%phi_ldop + zoo(nzoo)%phi_sldop + zoo(nzoo)%phi_srdop
+    do n = 1,NUM_ZOO !{
+       phi_sum_n = zoo(n)%phi_det + zoo(n)%phi_ldon + zoo(n)%phi_sldon + zoo(n)%phi_srdon
+       phi_sum_p = zoo(n)%phi_det + zoo(n)%phi_ldop + zoo(n)%phi_sldop + zoo(n)%phi_srdop
        if (abs(phi_sum_n - 1.0) > 1.0e-6 .or. abs(phi_sum_p - 1.0) > 1.0e-6) then
           write(phi_msg,'(a,a,a,f9.6,a,f9.6,a)') 'generic_COBALT: egestion partition for ', &
-               trim(zoo_suffix(nzoo)), ' must sum to 1.  phi_det + phi_ldon + phi_sldon + phi_srdon = ', &
+               trim(zoo_suffix(n)), ' must sum to 1.  phi_det + phi_ldon + phi_sldon + phi_srdon = ', &
                phi_sum_n, ', phi_det + phi_ldop + phi_sldop + phi_srdop = ', phi_sum_p, '.'
           call mpp_error(FATAL, trim(phi_msg))
        endif
-    enddo !} nzoo
+    enddo !} n
     phi_sum_n = cobalt%lysis_phi_ldon + cobalt%lysis_phi_sldon + cobalt%lysis_phi_srdon
     phi_sum_p = cobalt%lysis_phi_ldop + cobalt%lysis_phi_sldop + cobalt%lysis_phi_srdop
     if (abs(phi_sum_n - 1.0) > 1.0e-6 .or. abs(phi_sum_p - 1.0) > 1.0e-6) then

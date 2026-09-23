@@ -27,7 +27,7 @@ module COBALT_reg_diag
     ! local
     type(vardesc)  :: vardesc_temp
     integer :: axesTi(3)
-    integer :: nzoo                                     !< loop index over zooplankton groups
+    integer :: n                                        !< loop index over zooplankton groups
     !> Short and long names for each zooplankton group, ordered to match the group IDs in cobalt_types.
     !! These drive the loop-based registrations at the end of this routine; the older per-group blocks
     !! above remain written out explicitly.
@@ -5746,39 +5746,39 @@ module COBALT_reg_diag
 ! groups rather than written out group by group, so that adding a further group needs no edits here.
 !==============================================================================================================
 
-    do nzoo = 1,NUM_ZOO !{
+    do n = 1,NUM_ZOO !{
 
-       vardesc_temp = vardesc("jaggloss_n_"//trim(zoo_sfx(nzoo)), &
-                              "Loss of nitrogen from "//trim(zoo_name(nzoo))//" by aggregation", &
+       vardesc_temp = vardesc("jaggloss_n_"//trim(zoo_sfx(n)), &
+                              "Loss of nitrogen from "//trim(zoo_name(n))//" by aggregation", &
                               'h','L','s','mol N kg-1 s-1','f')
-       zoo(nzoo)%id_jaggloss_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+       zoo(n)%id_jaggloss_n = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
             init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
-       vardesc_temp = vardesc("jaggloss_p_"//trim(zoo_sfx(nzoo)), &
-                              "Loss of phosphorus from "//trim(zoo_name(nzoo))//" by aggregation", &
+       vardesc_temp = vardesc("jaggloss_p_"//trim(zoo_sfx(n)), &
+                              "Loss of phosphorus from "//trim(zoo_name(n))//" by aggregation", &
                               'h','L','s','mol P kg-1 s-1','f')
-       zoo(nzoo)%id_jaggloss_p = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+       zoo(n)%id_jaggloss_p = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
             init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
-       vardesc_temp = vardesc("jprod_ndet_fast_"//trim(zoo_sfx(nzoo)), &
-                              "Production of fast-sinking nitrogen detritus by "//trim(zoo_name(nzoo)), &
+       vardesc_temp = vardesc("jprod_ndet_fast_"//trim(zoo_sfx(n)), &
+                              "Production of fast-sinking nitrogen detritus by "//trim(zoo_name(n)), &
                               'h','L','s','mol N kg-1 s-1','f')
-       zoo(nzoo)%id_jprod_ndet_fast = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+       zoo(n)%id_jprod_ndet_fast = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
             init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
-       vardesc_temp = vardesc("jprod_pdet_fast_"//trim(zoo_sfx(nzoo)), &
-                              "Production of fast-sinking phosphorous detritus by "//trim(zoo_name(nzoo)), &
+       vardesc_temp = vardesc("jprod_pdet_fast_"//trim(zoo_sfx(n)), &
+                              "Production of fast-sinking phosphorous detritus by "//trim(zoo_name(n)), &
                               'h','L','s','mol P kg-1 s-1','f')
-       zoo(nzoo)%id_jprod_pdet_fast = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+       zoo(n)%id_jprod_pdet_fast = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
             init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
-       vardesc_temp = vardesc("jprod_fedet_fast_"//trim(zoo_sfx(nzoo)), &
-                              "Production of fast-sinking iron detritus by "//trim(zoo_name(nzoo)), &
+       vardesc_temp = vardesc("jprod_fedet_fast_"//trim(zoo_sfx(n)), &
+                              "Production of fast-sinking iron detritus by "//trim(zoo_name(n)), &
                               'h','L','s','mol Fe kg-1 s-1','f')
-       zoo(nzoo)%id_jprod_fedet_fast = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
+       zoo(n)%id_jprod_fedet_fast = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
             init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
-    enddo !} nzoo
+    enddo !} n
 
     vardesc_temp = vardesc("jprod_fedet_fast","Fast sinking iron detritus production, layer integral", &
                            'h','L','s','mol Fe kg-1 s-1','f')
