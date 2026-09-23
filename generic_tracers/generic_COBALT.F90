@@ -371,6 +371,12 @@ contains
 
     integer :: stdoutunit
     integer :: nzoo               !< loop index for validating the per-group DVM settings
+    real    :: phi_sum_n          !< sum of a partition of nitrogen losses, which must be 1 to conserve mass
+    real    :: phi_sum_p          !< sum of a partition of phosphorus losses, which must be 1 to conserve mass
+    character(len=256) :: phi_msg !< buffer for reporting a partition that does not sum to 1
+    !> parameter-name suffix of each zooplankton group, indexed by SMZ..LGT
+    character(len=5), dimension(NUM_ZOO), parameter :: zoo_suffix = &
+         (/ 'smz  ', 'mdz  ', 'lgz  ', 'vmmdz', 'vmlgz', 'smt  ', 'lgt  ' /)
 
     !=============
     !Block Starts: g_tracer_add_param
@@ -2151,6 +2157,31 @@ contains
     call get_param(param_file, "generic_COBALT", "phi_sldop_vir", cobalt%lysis_phi_sldop, &
                    "fraction of viral lysis of P to semi-labile dissolved organic phosphorus", units="none", &
                    default=0.3)
+
+    ! Egestion and viral lysis have no remainder term: every partition below is applied in full to the
+    ! detrital and dissolved organic pools, so any fraction that does not sum to 1 creates or destroys N or
+    ! P in every cell on every timestep.  Legacy COBALT parameter files are the usual culprit, since there
+    ! the zooplankton phi_* were fractions of total ingestion and summed to less than 1.  The defaults
+    ! satisfy this by construction; overriding phi_det_<group> alone is safe, overriding any other one
+    ! alone is not.
+    do nzoo = 1,NUM_ZOO !{
+       phi_sum_n = zoo(nzoo)%phi_det + zoo(nzoo)%phi_ldon + zoo(nzoo)%phi_sldon + zoo(nzoo)%phi_srdon
+       phi_sum_p = zoo(nzoo)%phi_det + zoo(nzoo)%phi_ldop + zoo(nzoo)%phi_sldop + zoo(nzoo)%phi_srdop
+       if (abs(phi_sum_n - 1.0) > 1.0e-6 .or. abs(phi_sum_p - 1.0) > 1.0e-6) then
+          write(phi_msg,'(a,a,a,f9.6,a,f9.6,a)') 'generic_COBALT: egestion partition for ', &
+               trim(zoo_suffix(nzoo)), ' must sum to 1.  phi_det + phi_ldon + phi_sldon + phi_srdon = ', &
+               phi_sum_n, ', phi_det + phi_ldop + phi_sldop + phi_srdop = ', phi_sum_p, '.'
+          call mpp_error(FATAL, trim(phi_msg))
+       endif
+    enddo !} nzoo
+    phi_sum_n = cobalt%lysis_phi_ldon + cobalt%lysis_phi_sldon + cobalt%lysis_phi_srdon
+    phi_sum_p = cobalt%lysis_phi_ldop + cobalt%lysis_phi_sldop + cobalt%lysis_phi_srdop
+    if (abs(phi_sum_n - 1.0) > 1.0e-6 .or. abs(phi_sum_p - 1.0) > 1.0e-6) then
+       write(phi_msg,'(a,f9.6,a,f9.6,a)') 'generic_COBALT: viral lysis partition must sum to 1.  '// &
+            'phi_ldon_vir + phi_sldon_vir + phi_srdon_vir = ', phi_sum_n, &
+            ', phi_ldop_vir + phi_sldop_vir + phi_srdop_vir = ', phi_sum_p, '.'
+       call mpp_error(FATAL, trim(phi_msg))
+    endif
     !
     !----------------------------------------------------------------------
     ! Parameters for feeding by unresolved higher predators
@@ -4090,6 +4121,7 @@ contains
     real :: a_theta, diff_theta2, diff_theta2_tol
     real :: tot_prey_hp, sw_fac_denom, basal_respiration, swim
     real :: egest_n, egest_p, egest_fe, egest_si  ! egested (unassimilated) material available for partitioning
+    real :: k_evac_gut                            ! temperature-dependent gut evacuation rate (s-1)
     real :: jclear_gut_n_usable                   ! gut-clearance N that P can match at q_p_2_n (mol N kg-1 s-1)
     real :: surplus_n                             ! assimilated gut-clearance N with no P partner (mol N kg-1 s-1)
     real :: resp_from_met                         ! respiration not covered by surplus_n, drawn from metabolites
@@ -6257,11 +6289,15 @@ contains
        !
        do m = 1,NUM_ZOO !{
          if ( zoo(m)%does_dvm ) then !{
-           ! Migrating groups: egestion follows gut clearance rather than ingestion
-           zoo(m)%jclear_gut_n(i,j,k)  = (zoo(m)%k_clear_gut + zoo(m)%k_temp_gut * Temp(i,j,k)) * zoo(m)%f_gut_n(i,j,k)
-           zoo(m)%jclear_gut_p(i,j,k)  = (zoo(m)%k_clear_gut + zoo(m)%k_temp_gut * Temp(i,j,k)) * zoo(m)%f_gut_p(i,j,k)
-           zoo(m)%jclear_gut_fe(i,j,k) = (zoo(m)%k_clear_gut + zoo(m)%k_temp_gut * Temp(i,j,k)) * zoo(m)%f_gut_fe(i,j,k)
-           zoo(m)%jclear_gut_si(i,j,k) = (zoo(m)%k_clear_gut + zoo(m)%k_temp_gut * Temp(i,j,k)) * zoo(m)%f_gut_si(i,j,k)
+           ! Migrating groups: egestion follows gut clearance rather than ingestion.  The evacuation rate is
+           ! linear in temperature and crosses zero at -k_clear_gut/k_temp_gut (-1.85 degC at the defaults),
+           ! which polar and sub-ice waters reach.  A negative rate would fill the gut from nothing and drive
+           ! egestion, detritus and DOM production negative, so it is floored at zero.
+           k_evac_gut = max(zoo(m)%k_clear_gut + zoo(m)%k_temp_gut * Temp(i,j,k), 0.0)
+           zoo(m)%jclear_gut_n(i,j,k)  = k_evac_gut * zoo(m)%f_gut_n(i,j,k)
+           zoo(m)%jclear_gut_p(i,j,k)  = k_evac_gut * zoo(m)%f_gut_p(i,j,k)
+           zoo(m)%jclear_gut_fe(i,j,k) = k_evac_gut * zoo(m)%f_gut_fe(i,j,k)
+           zoo(m)%jclear_gut_si(i,j,k) = k_evac_gut * zoo(m)%f_gut_si(i,j,k)
 
            egest_n  = (1.0 - zoo(m)%assim_eff(i,j,k))*zoo(m)%jclear_gut_n(i,j,k)
            egest_p  = (1.0 - zoo(m)%assim_eff(i,j,k))*zoo(m)%jclear_gut_p(i,j,k)
