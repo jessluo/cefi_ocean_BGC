@@ -4069,7 +4069,6 @@ contains
     integer :: nb
     real :: r_dt
     real :: feprime_temp
-    real :: fescav_tot   ! combined iron scavenging onto both detrital pools (mol Fe kg-1 s-1)
     real :: k_po4_adjust
     real :: TK, PRESS, PKSPA, PKSPC
     real :: tmp_hblt, tmp_irrad, tmp_irrad_ML,tmp_opacity,tmp_mu_ML
@@ -6861,27 +6860,17 @@ contains
        cobalt%fe_sol(i,j,k) = 10**(-10.53 + 322.5/(Temp(i,j,k)+273.15) - 2.524*sqrt(fe_salt) + &
                               2.921*fe_salt)
 
-       ! Calculate the iron adsorption to detrital particles
+       ! Calculate the iron adsorption to detrital particles.  This is the COBALTv3 form: scavenging scales
+       ! with both detrital pools and all adsorbed iron goes to the standard fedet pool.
        if (cobalt%feprime(i,j,k) .lt. cobalt%fe_sol(i,j,k)) then
          cobalt%jfe_ads(i,j,k) = cobalt%alpha_fescav*cobalt%feprime(i,j,k) + &
-                                 cobalt%beta_fescav*cobalt%feprime(i,j,k)*cobalt%f_ndet(i,j,k)
-         cobalt%jfe_ads_fast(i,j,k) = cobalt%beta_fescav*cobalt%feprime(i,j,k)*cobalt%f_ndet_fast(i,j,k)
+                                 cobalt%beta_fescav*cobalt%feprime(i,j,k)*(cobalt%f_ndet(i,j,k)+cobalt%f_ndet_fast(i,j,k))
        else
          cobalt%jfe_ads(i,j,k) = cobalt%fast_fescav_fac*(cobalt%alpha_fescav*cobalt%feprime(i,j,k) + &
-                                 cobalt%beta_fescav*cobalt%feprime(i,j,k)*cobalt%f_ndet(i,j,k))
-         cobalt%jfe_ads_fast(i,j,k) = cobalt%fast_fescav_fac* &
-                                 cobalt%beta_fescav*cobalt%feprime(i,j,k)*cobalt%f_ndet_fast(i,j,k)
+                                 cobalt%beta_fescav*cobalt%feprime(i,j,k)*(cobalt%f_ndet(i,j,k)+cobalt%f_ndet_fast(i,j,k)))
        endif
-       ! Add a limiter so you don't scavenge more than half the available iron in a single time step.  The
-       ! limiter is applied to the combined flux so that the two detrital pools compete for the same
-       ! dissolved iron rather than each being allowed half of it.
-       fescav_tot = cobalt%jfe_ads(i,j,k) + cobalt%jfe_ads_fast(i,j,k)
-       if (fescav_tot .gt. cobalt%f_fed(i,j,k)/(2.0*dt)) then
-          cobalt%jfe_ads(i,j,k)      = cobalt%jfe_ads(i,j,k)      * &
-                                       cobalt%f_fed(i,j,k)/(2.0*dt*(fescav_tot + epsln))
-          cobalt%jfe_ads_fast(i,j,k) = cobalt%jfe_ads_fast(i,j,k) * &
-                                       cobalt%f_fed(i,j,k)/(2.0*dt*(fescav_tot + epsln))
-       endif
+       ! Add a limiter so you don't scavenge more than half the available iron in a single time step.
+       cobalt%jfe_ads(i,j,k) = min(cobalt%jfe_ads(i,j,k),cobalt%f_fed(i,j,k)/(2.0*dt))
 
     enddo; enddo; enddo  !} i,j,k
 
@@ -7658,8 +7647,7 @@ contains
        cobalt%jfed(i,j,k) = cobalt%jprod_fed(i,j,k) + cobalt%jfe_coast(i,j,k) + &
                             cobalt%jfe_iceberg(i,j,k) - phyto(DIAZ)%juptake_fe(i,j,k) - &
                             phyto(LGP)%juptake_fe(i,j,k) - phyto(MDP)%juptake_fe(i,j,k) - &
-                            phyto(SMP)%juptake_fe(i,j,k) - cobalt%jfe_ads(i,j,k) - &
-                            cobalt%jfe_ads_fast(i,j,k)
+                            phyto(SMP)%juptake_fe(i,j,k) - cobalt%jfe_ads(i,j,k)
        cobalt%p_fed(i,j,k,tau) = cobalt%p_fed(i,j,k,tau) + cobalt%jfed(i,j,k) * dt * grid_tmask(i,j,k)
     enddo; enddo; enddo  !} i,j,k
 
@@ -7725,7 +7713,6 @@ contains
        !
        ! Fedet_fast
        !
-       cobalt%jprod_fedet_fast(i,j,k) = cobalt%jprod_fedet_fast(i,j,k) + cobalt%jfe_ads_fast(i,j,k)
        cobalt%jfedet_fast(i,j,k) = cobalt%jprod_fedet_fast(i,j,k) - cobalt%jremin_fedet_fast(i,j,k)
        cobalt%p_fedet_fast(i,j,k,tau) = cobalt%p_fedet_fast(i,j,k,tau) + &
                                         cobalt%jfedet_fast(i,j,k)*dt*grid_tmask(i,j,k)
@@ -9698,7 +9685,6 @@ contains
     allocate(cobalt%jremin_fedet(isd:ied, jsd:jed, 1:nk)) ; cobalt%jremin_fedet=0.0
     allocate(cobalt%jremin_fedet_fast(isd:ied, jsd:jed, 1:nk)) ; cobalt%jremin_fedet_fast=0.0
     allocate(cobalt%jfe_ads(isd:ied, jsd:jed, 1:nk))      ; cobalt%jfe_ads=0.0
-    allocate(cobalt%jfe_ads_fast(isd:ied, jsd:jed, 1:nk)) ; cobalt%jfe_ads_fast=0.0
     allocate(cobalt%jfe_coast(isd:ied, jsd:jed, 1:nk))    ; cobalt%jfe_coast=0.0
     allocate(cobalt%jfe_iceberg(isd:ied, jsd:jed, 1:nk))  ; cobalt%jfe_iceberg=0.0
     allocate(cobalt%jno3_iceberg(isd:ied, jsd:jed, 1:nk)) ; cobalt%jno3_iceberg=0.0
@@ -10362,7 +10348,6 @@ contains
     deallocate(cobalt%jremin_fedet)
     deallocate(cobalt%jremin_fedet_fast)
     deallocate(cobalt%jfe_ads)
-    deallocate(cobalt%jfe_ads_fast)
     deallocate(cobalt%jfe_coast)
     deallocate(cobalt%jfe_iceberg)
     deallocate(cobalt%jno3_iceberg)

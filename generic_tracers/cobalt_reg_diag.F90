@@ -5790,11 +5790,6 @@ module COBALT_reg_diag
     cobalt%id_jremin_fedet_fast = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
          init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
 
-    vardesc_temp = vardesc("jfe_ads_fast","Iron adsorption onto fast sinking detritus, layer integral", &
-                           'h','L','s','mol Fe kg-1 s-1','f')
-    cobalt%id_jfe_ads_fast = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
-         init_time, vardesc_temp%longname,vardesc_temp%units, missing_value = missing_value1)
-
     vardesc_temp = vardesc("jfedet_fast","Fast sinking iron detritus source/sink, layer integral", &
                            'h','L','s','mol Fe kg-1 s-1','f')
     cobalt%id_jfedet_fast = register_diag_field(package_name, vardesc_temp%name, axes(1:3),&
