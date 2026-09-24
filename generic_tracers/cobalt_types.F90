@@ -41,24 +41,32 @@ module cobalt_types
 
   ! parameters
   integer, parameter, public :: NUM_PHYTO = 4 !< total number of phytoplankton groups
-  integer, parameter, public :: NUM_ZOO = 5   !< total number of zooplankton groups
+  integer, parameter, public :: NUM_ZOO = 7   !< total number of zooplankton groups
   integer, parameter, public :: NUM_BACT = 1  !< total number of bacteria groups
-  integer, parameter, public :: NUM_PREY = 11  !< total numbers of prey groups
+  integer, parameter, public :: NUM_PREY = 13  !< total numbers of prey groups
 
-  ! phytoplankton IDs
+  ! Phytoplankton group IDs.  These index the phyto(:) array of type(phytoplankton).
   integer, parameter, public :: DIAZ       = 1 !< ID for diazotrophs
   integer, parameter, public :: LGP        = 2 !< ID for large phytoplankton
   integer, parameter, public :: MDP        = 3 !< ID for medium phytoplankton
   integer, parameter, public :: SMP        = 4 !< ID for small phytoplankton
 
-  ! zooplankton IDs
+  ! Zooplankton group IDs.  These index the zoo(:) array of type(zooplankton).  New groups are
+  ! appended so that the indices of pre-existing groups are never disturbed; code that needs to
+  ! know whether a group performs diel vertical migration must test zoo(n)%does_dvm rather than
+  ! relying on where the group sits in this list.
   integer, parameter, public :: SMZ        = 1 !< ID for small zooplankton
   integer, parameter, public :: MDZ        = 2 !< ID for medium zooplankton
   integer, parameter, public :: LGZ        = 3 !< ID for large zooplankton
-  integer, parameter, public :: VMMDZ      = 4 !< ID for vertically migrating mesozooplankton
+  integer, parameter, public :: VMMDZ      = 4 !< ID for vertically migrating medium zooplankton
   integer, parameter, public :: VMLGZ      = 5 !< ID for vertically migrating large zooplankton
+  integer, parameter, public :: SMT        = 6 !< ID for small tunicates (appendicularians)
+  integer, parameter, public :: LGT        = 7 !< ID for large tunicates (salps)
 
-  ! prey array IDs
+  ! Prey array IDs.  These index the columns of ipa_matrix/pa_matrix/ingest_matrix and the entries
+  ! of prey_vec.  The ordering is dictated by the ingestion bookkeeping loops, which assume prey are
+  ! ordered phytoplankton, bacteria, zooplankton, then detritus, and that zooplankton group n
+  ! occupies prey slot NUM_PHYTO + NUM_BACT + n.
   integer, parameter, public :: PR_DIAZ   = 1  !< prey array ID for diazotrophs
   integer, parameter, public :: PR_LGP    = 2  !< prey array ID for large phytoplankton
   integer, parameter, public :: PR_MDP    = 3  !< prey array ID for medium phytoplankton
@@ -67,9 +75,11 @@ module cobalt_types
   integer, parameter, public :: PR_SMZ    = 6  !< prey array ID for small zooplankton
   integer, parameter, public :: PR_MDZ    = 7  !< prey array ID for medium zooplankton
   integer, parameter, public :: PR_LGZ    = 8  !< prey array ID for large zooplankton
-  integer, parameter, public :: PR_VMMDZ  = 9  !< prey array ID for vertically migrating mesozooplankton
-  integer, parameter, public :: PR_VMLGZ  = 10 !< prey array ID for vertically migrating large zooplankton
-  integer, parameter, public :: PR_DET    = 11 !< prey array ID for detritus
+  integer, parameter, public :: PR_VMMDZ  = 9  !< prey array ID for migrating medium zooplankton
+  integer, parameter, public :: PR_VMLGZ  = 10 !< prey array ID for migrating large zooplankton
+  integer, parameter, public :: PR_SMT    = 11 !< prey array ID for small tunicates
+  integer, parameter, public :: PR_LGT    = 12 !< prey array ID for large tunicates
+  integer, parameter, public :: PR_DET    = 13 !< prey array ID for detritus (slow + fast sinking)
 
   real, parameter, public :: sperd = 24.0 * 3600.0    !< number of seconds in a day (sec)
   real, parameter, public :: I_sperd = 1.0/sperd      !< inverse of number of seconds in a day (sec)
@@ -285,12 +295,16 @@ module cobalt_types
 
   !> zooplankton data type
   type zooplankton
+    logical does_dvm       !< .true. if this group performs diel vertical migration (carries gut
+                           !! and metabolite pools and is given a non-zero swimming velocity)
     real imax              !< maximum ingestion rate (sec-1)
     real ki                !< half-sat for ingestion (moles N m-3)
     real gge_max           !< max gross growth efficiciency (approached as i >> bresp, dimensionless)
     real nswitch           !< switching parameter (dimensionless)
     real mswitch           !< switching parameter (dimensionless)
     real bresp             !< basal respiration rate (sec-1)
+    real agg               !< aggregation loss rate (sec-1 (moles N kg-1)-1)
+    real frac_fast_det     !< fraction of this group's egested detritus that is fast-sinking
     real ktemp             !< temperature dependence of zooplankton rates (C-1)
     real k_clear_gut       ! mpoupon
     real k_temp_gut        ! mpoupon
@@ -322,6 +336,8 @@ module cobalt_types
     real ipa_lgz           !< innate prey availability of x-large zooplankton
     real ipa_vmmdz         !< innate prey availability of large migrating zooplankton
     real ipa_vmlgz         !< innate prey availability of x-large migrating zooplankton
+    real ipa_smt           !< innate prey availability of small tunicates (appendicularians)
+    real ipa_lgt           !< innate prey availability of large tunicates (salps)
     real ipa_det           !< innate prey availability of detritus
     real ipa_bact          !< innate prey availability for bacteria
     real, ALLOCATABLE, dimension(:,:)  ::   jprod_n_100     !< zooplankton nitrogen prod. integral in upper 100m
@@ -349,10 +365,13 @@ module cobalt_types
     real, ALLOCATABLE, dimension(:,:,:) ::  jprod_gut_si    ! mpoupon
     real, ALLOCATABLE, dimension(:,:,:) ::  jclear_met_n    ! mpoupon
     real, ALLOCATABLE, dimension(:,:,:) ::  jprod_met_n     ! mpoupon 
-    real, ALLOCATABLE, dimension(:,:,:) ::  lim_nut_n_ingestion  ! mpoupon
+    real, ALLOCATABLE, dimension(:,:,:) ::  jclear_gut_n_usable  ! gut-clearance N that gut-clearance P
+                                            ! can match at q_p_2_n, min(N, P/q_p_2_n); migrating groups only
     real, ALLOCATABLE, dimension(:,:,:) ::  jmetabo_n    ! mpoupon
     real, ALLOCATABLE, dimension(:,:,:) ::  jzloss_n     !< Losses of n due to consumption by other zooplankton groups
     real, ALLOCATABLE, dimension(:,:,:) ::  jzloss_p     !< Losses of p due to consumption by other zooplankton groups
+    real, ALLOCATABLE, dimension(:,:,:) ::  jaggloss_n   !< Losses of n due to aggregation (e.g. salp falls)
+    real, ALLOCATABLE, dimension(:,:,:) ::  jaggloss_p   !< Losses of p due to aggregation (e.g. salp falls)
     real, ALLOCATABLE, dimension(:,:,:) ::  jhploss_n    !< Losses of n due to consumption by unresolved higher preds
     real, ALLOCATABLE, dimension(:,:,:) ::  jhploss_p    !< Losses of p due to consumption by unresolved higher preds
     real, ALLOCATABLE, dimension(:,:,:) ::  jingest_n    !< Total ingestion of n
@@ -362,6 +381,9 @@ module cobalt_types
     real, ALLOCATABLE, dimension(:,:,:) ::  jingest_fe   !< Total ingestion of iron
     real, ALLOCATABLE, dimension(:,:,:) ::  jprod_ndet   !< production of nitrogen detritus by zooplankton group
     real, ALLOCATABLE, dimension(:,:,:) ::  jprod_pdet   !< production of phosphorous detritus by zooplankton group
+    real, ALLOCATABLE, dimension(:,:,:) ::  jprod_ndet_fast  !< production of fast-sinking nitrogen detritus
+    real, ALLOCATABLE, dimension(:,:,:) ::  jprod_pdet_fast  !< production of fast-sinking phosphorous detritus
+    real, ALLOCATABLE, dimension(:,:,:) ::  jprod_fedet_fast !< production of fast-sinking iron detritus
     real, ALLOCATABLE, dimension(:,:,:) ::  jprod_ldon   !< production of labile dissolved organic N by zooplankton group
     real, ALLOCATABLE, dimension(:,:,:) ::  jprod_ldop   !< production of labile dissolved organic P by zooplankton group
     real, ALLOCATABLE, dimension(:,:,:) ::  jprod_srdon  !< production of semi-refractory dissolved organic N by zooplankton group
@@ -385,6 +407,8 @@ module cobalt_types
     real, ALLOCATABLE, dimension(:,:,:)  ::  vmove_met
     integer ::  id_jzloss_n       = -1 !< ID associated with diagnostics for losses of n due to consumption by other zooplankton groups
     integer ::  id_jzloss_p       = -1 !< ID associated with diagnostics for losses of p due to consumption by other zooplankton groups
+    integer ::  id_jaggloss_n     = -1 !< ID associated with diagnostics for losses of n due to aggregation
+    integer ::  id_jaggloss_p     = -1 !< ID associated with diagnostics for losses of p due to aggregation
     integer ::  id_jhploss_n      = -1 !< ID associated with diagnostics for losses of n due to consumption by unresolved higher preds
     integer ::  id_jhploss_p      = -1 !< ID associated with diagnostics for losses of p due to consumption by unresolved higher preds
     integer ::  id_jingest_n      = -1 !< ID associated with diagnostics for total ingestion of n
@@ -393,6 +417,9 @@ module cobalt_types
     integer ::  id_jingest_fe     = -1 !< ID associated with diagnostics for total ingestion of iron
     integer ::  id_jprod_ndet     = -1 !< ID associated with diagnostics for production of nitrogen detritus by zooplankton group
     integer ::  id_jprod_pdet     = -1 !< ID associated with diagnostics for production of phosphorous detritus by zooplankton group
+    integer ::  id_jprod_ndet_fast  = -1 !< ID associated with diagnostics for production of fast-sinking nitrogen detritus
+    integer ::  id_jprod_pdet_fast  = -1 !< ID associated with diagnostics for production of fast-sinking phosphorous detritus
+    integer ::  id_jprod_fedet_fast = -1 !< ID associated with diagnostics for production of fast-sinking iron detritus
     integer ::  id_jprod_ldon     = -1 !< ID associated with diagnostics for production of labile dissolved organic N by zooplankton group
     integer ::  id_jprod_ldop     = -1 !< ID associated with diagnostics for production of labile dissolved organic P by zooplankton group
     integer ::  id_jprod_srdon    = -1 !< ID associated with diagnostics for production of semi-refractory dissolved organic N by zooplankton group
@@ -422,7 +449,7 @@ module cobalt_types
     integer ::   id_jclear_met_n      = -1 !
     integer ::   id_jprod_met_n       = -1 !
     integer ::   id_jmetabo_n         = -1 !
-    integer ::   id_lim_nut_n_ingestion = -1 !
+    integer ::   id_jclear_gut_n_usable = -1 !
     integer ::  id_jprod_n_100    = -1 !< ID associated with diagnostics for zooplankton nitrogen prod. integral in upper 100m
     integer ::  id_jingest_n_100  = -1 !< ID associated with diagnostics for zooplankton nitrogen ingestion integral in upper 100m
     integer ::  id_jzloss_n_100   = -1 !< ID associated with diagnostics for zooplankton nitrogen loss to zooplankton integral in upper 100m
@@ -637,6 +664,8 @@ module cobalt_types
           hp_ipa_lgz,       & ! "  "  "  "  "  "  "  "  "   large zooplankton to hp
           hp_ipa_vmmdz,     & ! "  "  "  "  "  "  "  "  "   large migrating zooplankton to hp
           hp_ipa_vmlgz,     & ! "  "  "  "  "  "  "  "  "   x-large migrating zooplankton to hp
+          hp_ipa_smt,       & ! "  "  "  "  "  "  "  "  "   small tunicates to hp
+          hp_ipa_lgt,       & ! "  "  "  "  "  "  "  "  "   large tunicates to hp
           hp_ipa_det,       & ! "  "  "  "  "  "  "  "  "   detritus to hp
           hp_phi_det,       & ! fraction of ingested N to detritus
           frac_fastsinking    ! fraction of higher predator detritus that is fast-sinking
@@ -673,6 +702,7 @@ module cobalt_types
           f_dic,&
           f_fed,&
           f_fedet,&
+          f_fedet_fast,&
           f_ldon,&
           f_ldop,&
           f_lith,&
@@ -706,6 +736,7 @@ module cobalt_types
           f_cadet_arag_btf,&
           f_cadet_calc_btf,&
           f_fedet_btf, &
+          f_fedet_fast_btf, &
           f_lithdet_btf, &
           f_ndet_btf,&
           f_ndet_fast_btf,&
@@ -746,6 +777,13 @@ module cobalt_types
           jsivmlgz_gut,& ! mpoupon
           jnvmmdz_met,&  ! mpoupon
           jnvmlgz_met,&  ! mpoupon
+          jnsmt,&        ! small tunicates
+          jnlgt,&        ! large tunicates (migrating, so they carry gut and metabolite pools)
+          jnlgt_gut,&
+          jplgt_gut,&
+          jfelgt_gut,&
+          jsilgt_gut,&
+          jnlgt_met,&
           jalk,&
           jalkh,&
           jalk_plus_btm,&
@@ -766,6 +804,7 @@ module cobalt_types
           jpmd,&
           jplg,&
           jfedet,&
+          jfedet_fast,&
           jldon,&
           jldop,&
           jlith,&
@@ -809,6 +848,7 @@ module cobalt_types
           jprod_srdop,&
           jprod_fed,&
           jprod_fedet,&
+          jprod_fedet_fast,&
           jprod_sidet,&
           jprod_sio4, &
           jprod_lithdet,&
@@ -837,6 +877,7 @@ module cobalt_types
           jremin_pdet,&
           jremin_pdet_fast,&
           jremin_fedet,&
+          jremin_fedet_fast,&
           jfe_ads,&
           jfe_coast,&
           jfe_iceberg,&
@@ -909,6 +950,7 @@ module cobalt_types
           fcadet_arag_btm,&
           fcadet_calc_btm,&
           ffedet_btm,&
+          ffedet_fast_btm,&
           flithdet_btm,&
           fpdet_btm,&
           fpdet_fast_btm,&
@@ -947,6 +989,7 @@ module cobalt_types
 ! << Add neritic CaCO3 burial >>
           jdic_caco3_nerbur_150,&
           jprod_mesozoo_200, &
+          jprod_tunicate_200, &
           jremin_ndet_100, &
           jremin_ndet_fast_100, &
           f_ndet_100, &
@@ -955,6 +998,7 @@ module cobalt_types
           f_simd_100, &
           f_silg_100, &
           f_mesozoo_200, &
+          f_tunicate_200, &
           fndet_100, &
           fndet_fast_100, &
           fpdet_100, &
@@ -1049,6 +1093,7 @@ module cobalt_types
           p_do14c,&
           p_fed,&
           p_fedet,&
+          p_fedet_fast,&
           p_fedi,&
           p_felg,&
           p_femd,&
@@ -1096,7 +1141,14 @@ module cobalt_types
           p_sivmmdz_gut,& ! mpoupon
           p_sivmlgz_gut,& ! mpoupon
           p_nvmmdz_met,&  ! mpoupon
-          p_nvmlgz_met    ! mpoupon
+          p_nvmlgz_met,&  ! mpoupon
+          p_nsmt,&        ! small tunicates
+          p_nlgt,&        ! large tunicates (migrating, so they carry gut and metabolite pools)
+          p_nlgt_gut,&
+          p_plgt_gut,&
+          p_felgt_gut,&
+          p_silgt_gut,&
+          p_nlgt_met
 
       real, dimension (:,:), allocatable :: &
           runoff_flux_alk,&
@@ -1163,6 +1215,7 @@ module cobalt_types
           id_jprod_srdop   = -1,       &
           id_jprod_fed     = -1,       &
           id_jprod_fedet   = -1,       &
+          id_jprod_fedet_fast = -1,    &
           id_jprod_sidet   = -1,       &
           id_jprod_sio4    = -1,       &
           id_jprod_lithdet = -1,       &
@@ -1185,6 +1238,7 @@ module cobalt_types
           id_jremin_pdet   = -1,       &
           id_jremin_pdet_fast = -1,       &
           id_jremin_fedet  = -1,       &
+          id_jremin_fedet_fast = -1,   &
           id_jfe_ads       = -1,       &
           id_jfe_coast     = -1,       &
           id_jfe_iceberg   = -1,       &
@@ -1219,6 +1273,7 @@ module cobalt_types
           id_jndet         = -1,       &
           id_jndeth        = -1,       &
           id_jndet_fast    = -1,       &
+          id_jfedet_fast   = -1,       &
           id_jnh4_plus_btm = -1,       &
           id_jno3denit_wc  = -1,       &
           id_juptake_no3amx = -1,      &
@@ -1234,6 +1289,7 @@ module cobalt_types
           id_fcadet_arag_tp = -1,      &
           id_fcadet_calc_tp = -1,      &
           id_ffedet_tp     = -1,       &
+          id_ffedet_fast_tp = -1,      &
           id_fndet_tp      = -1,       &
           id_fndet_fast_tp = -1,       &
           id_fpdet_tp      = -1,       &
@@ -1260,6 +1316,7 @@ module cobalt_types
           id_fcadet_arag_btm = -1,     &
           id_fcadet_calc_btm = -1,     &
           id_ffedet_btm    = -1,       &
+          id_ffedet_fast_btm = -1,     &
           id_flithdet_btm  = -1,       &
           id_fndet_btm     = -1,       &
           id_fndet_fast_btm = -1,       &
@@ -1408,6 +1465,7 @@ module cobalt_types
 ! << Add neritic CaCO3 burial >>
           id_jdic_caco3_nerbur_150 = -1, &
           id_jprod_mesozoo_200 = -1,   &
+          id_jprod_tunicate_200 = -1,  &
           id_daylength         = -1,   &
           id_jremin_ndet_100 = -1,     &
           id_jremin_ndet_fast_100 = -1,     &
@@ -1417,6 +1475,7 @@ module cobalt_types
           id_f_silg_100 = -1,          &
           id_f_simd_100 = -1,          &
           id_f_mesozoo_200 = -1,       &
+          id_f_tunicate_200 = -1,      &
           id_fndet_100 = -1,           &
           id_fndet_fast_100 = -1,           &
           id_fpdet_100 = -1,           &
