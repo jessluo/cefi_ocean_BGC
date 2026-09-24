@@ -6295,15 +6295,15 @@ contains
        !
        do m = 1,NUM_ZOO !{
          if ( zoo(m)%does_dvm ) then !{
-           ! Migrating groups: egestion follows gut clearance rather than ingestion.  The evacuation rate is
-           ! linear in temperature and crosses zero at -k_clear_gut/k_temp_gut (-1.85 degC at the defaults),
-           ! which polar and sub-ice waters reach.  A negative rate would fill the gut from nothing and drive
-           ! egestion, detritus and DOM production negative, so it is floored at zero.
+           ! Migrating groups: egestion follows gut clearance rather than ingestion.
+
+           ! Compute a gut evacuation rate and prevent it from going negative under low temperatures
            k_evac_gut = max(zoo(m)%k_clear_gut + zoo(m)%k_temp_gut * Temp(i,j,k), 0.0)
-           zoo(m)%jclear_gut_n(i,j,k)  = k_evac_gut * zoo(m)%f_gut_n(i,j,k)
-           zoo(m)%jclear_gut_p(i,j,k)  = k_evac_gut * zoo(m)%f_gut_p(i,j,k)
-           zoo(m)%jclear_gut_fe(i,j,k) = k_evac_gut * zoo(m)%f_gut_fe(i,j,k)
-           zoo(m)%jclear_gut_si(i,j,k) = k_evac_gut * zoo(m)%f_gut_si(i,j,k)
+           ! min() here prevents gut evacuation rate from exceeding 1 (per timestep)
+           zoo(m)%jclear_gut_n(i,j,k)  = min(1.0, k_evac_gut*dt) * r_dt * zoo(m)%f_gut_n(i,j,k)
+           zoo(m)%jclear_gut_p(i,j,k)  = min(1.0, k_evac_gut*dt) * r_dt * zoo(m)%f_gut_p(i,j,k)
+           zoo(m)%jclear_gut_fe(i,j,k) = min(1.0, k_evac_gut*dt) * r_dt * zoo(m)%f_gut_fe(i,j,k)
+           zoo(m)%jclear_gut_si(i,j,k) = min(1.0, k_evac_gut*dt) * r_dt * zoo(m)%f_gut_si(i,j,k)
 
            egest_n  = (1.0 - zoo(m)%assim_eff(i,j,k))*zoo(m)%jclear_gut_n(i,j,k)
            egest_p  = (1.0 - zoo(m)%assim_eff(i,j,k))*zoo(m)%jclear_gut_p(i,j,k)
